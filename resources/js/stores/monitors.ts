@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
 import { http } from '@/lib/http';
+import type { Incident, MetricsWindow, MonitorMetrics } from '@/types/metrics';
 import type { CheckRecordedEvent, IncidentEvent, Monitor, MonitorInput } from '@/types/monitor';
 
 export const useMonitorsStore = defineStore('monitors', () => {
@@ -40,6 +41,38 @@ export const useMonitorsStore = defineStore('monitors', () => {
     async function remove(id: number): Promise<void> {
         await http.delete(`/api/monitors/${id}`);
         monitors.value = monitors.value.filter((monitor) => monitor.id !== id);
+    }
+
+    async function fetchOne(id: number): Promise<Monitor> {
+        const { data } = await http.get<{ data: Monitor }>(`/api/monitors/${id}`);
+        if (find(id)) {
+            replace(data.data);
+        } else {
+            monitors.value.push(data.data);
+        }
+        return data.data;
+    }
+
+    async function fetchMetrics(
+        id: number,
+        window: MetricsWindow = '24h',
+    ): Promise<MonitorMetrics> {
+        const { data } = await http.get<MonitorMetrics>(`/api/monitors/${id}/metrics`, {
+            params: { window },
+        });
+        return data;
+    }
+
+    async function fetchIncidents(id: number): Promise<Incident[]> {
+        const { data } = await http.get<{ data: Incident[] }>(`/api/monitors/${id}/incidents`);
+        return data.data;
+    }
+
+    async function acknowledgeIncident(incidentId: number): Promise<Incident> {
+        const { data } = await http.post<{ data: Incident }>(
+            `/api/incidents/${incidentId}/acknowledge`,
+        );
+        return data.data;
     }
 
     function find(id: number): Monitor | null {
@@ -82,6 +115,10 @@ export const useMonitorsStore = defineStore('monitors', () => {
         loading,
         loaded,
         fetchAll,
+        fetchOne,
+        fetchMetrics,
+        fetchIncidents,
+        acknowledgeIncident,
         create,
         update,
         togglePause,

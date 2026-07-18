@@ -133,4 +133,28 @@ describe('monitors store', () => {
         store.applyIncidentClosed({ monitor_id: 1, incident_id: 9 });
         expect(store.monitors[0]?.has_open_incident).toBe(false);
     });
+
+    it('requests metrics for the given window', async () => {
+        mockedGet.mockResolvedValue({
+            data: { uptime: { '24h': 100 }, latency: { window: '7d', points: [] } },
+        });
+
+        const store = useMonitorsStore();
+        const result = await store.fetchMetrics(1, '7d');
+
+        expect(mockedGet).toHaveBeenCalledWith('/api/monitors/1/metrics', {
+            params: { window: '7d' },
+        });
+        expect(result.latency.window).toBe('7d');
+    });
+
+    it('acknowledges an incident through the API', async () => {
+        mockedPost.mockResolvedValue({ data: { data: { id: 5, status: 'acknowledged' } } });
+
+        const store = useMonitorsStore();
+        const incident = await store.acknowledgeIncident(5);
+
+        expect(mockedPost).toHaveBeenCalledWith('/api/incidents/5/acknowledge');
+        expect(incident.status).toBe('acknowledged');
+    });
 });

@@ -126,7 +126,14 @@ function statusBadge(monitor: Monitor): StatusBadge {
                                     {{ statusBadge(monitor).text }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3 font-medium text-slate-100">{{ monitor.name }}</td>
+                            <td class="px-4 py-3 font-medium">
+                                <RouterLink
+                                    :to="{ name: 'monitors.show', params: { id: monitor.id } }"
+                                    class="text-slate-100 hover:text-emerald-400"
+                                >
+                                    {{ monitor.name }}
+                                </RouterLink>
+                            </td>
                             <td class="px-4 py-3 text-slate-400 uppercase">{{ monitor.type }}</td>
                             <td class="max-w-xs truncate px-4 py-3 text-slate-400">
                                 {{ monitor.target

@@ -32,6 +32,12 @@ export const router = createRouter({
             meta: { auth: true },
         },
         {
+            path: '/monitors/:id',
+            name: 'monitors.show',
+            component: () => import('@/pages/MonitorDetailPage.vue'),
+            meta: { auth: true },
+        },
+        {
             path: '/monitors/:id/edit',
             name: 'monitors.edit',
             component: () => import('@/pages/MonitorFormPage.vue'),
