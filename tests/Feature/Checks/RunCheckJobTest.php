@@ -5,13 +5,22 @@ declare(strict_types=1);
 use App\Checks\CheckExecutorFactory;
 use App\Jobs\RunCheckJob;
 use App\Models\Monitor;
+use App\Services\IncidentManager;
 use Illuminate\Support\Facades\Http;
+
+function runCheck(Monitor $monitor): void
+{
+    (new RunCheckJob($monitor))->handle(
+        app(CheckExecutorFactory::class),
+        app(IncidentManager::class),
+    );
+}
 
 it('records an ok result for a healthy http monitor', function () {
     Http::fake(['*' => Http::response('OK', 200)]);
     $monitor = Monitor::factory()->create();
 
-    (new RunCheckJob($monitor))->handle(app(CheckExecutorFactory::class));
+    runCheck($monitor);
 
     $this->assertDatabaseHas('check_results', [
         'monitor_id' => $monitor->id,
@@ -24,7 +33,7 @@ it('records a failed result with an error message on a bad response', function (
     Http::fake(['*' => Http::response('', 500)]);
     $monitor = Monitor::factory()->create();
 
-    (new RunCheckJob($monitor))->handle(app(CheckExecutorFactory::class));
+    runCheck($monitor);
 
     $result = $monitor->checkResults()->sole();
 

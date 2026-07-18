@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 
 /**
@@ -29,7 +30,7 @@ use Illuminate\Support\Carbon;
 class AlertChannel extends Model
 {
     /** @use HasFactory<AlertChannelFactory> */
-    use HasFactory;
+    use HasFactory, Notifiable;
 
     /**
      * Get the attributes that should be cast.
@@ -54,5 +55,23 @@ class AlertChannel extends Model
     public function monitors(): BelongsToMany
     {
         return $this->belongsToMany(Monitor::class);
+    }
+
+    /**
+     * Route mail notifications to this channel's address when it is an email
+     * channel; other channel types return null so the mail driver is skipped.
+     */
+    public function routeNotificationForMail(): ?string
+    {
+        return $this->type === AlertChannelType::Email ? $this->destination : null;
+    }
+
+    /**
+     * Route Telegram notifications to this channel's chat id when it is a
+     * Telegram channel.
+     */
+    public function routeNotificationForTelegram(): ?string
+    {
+        return $this->type === AlertChannelType::Telegram ? $this->destination : null;
     }
 }
