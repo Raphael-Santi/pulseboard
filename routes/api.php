@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\HeartbeatController;
 use App\Http\Controllers\Api\IncidentController;
 use App\Http\Controllers\Api\MonitorController;
 use App\Http\Controllers\Api\MonitorMetricsController;
+use App\Http\Controllers\Api\PublicStatusController;
+use App\Http\Controllers\Api\StatusPageController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -13,6 +15,10 @@ use Illuminate\Support\Facades\Route;
 Route::post('hb/{token}', [HeartbeatController::class, 'ping'])
     ->middleware('throttle:60,1')
     ->name('heartbeat.ping');
+
+// Public: unauthenticated status page consumed by /status/{slug} in the SPA.
+Route::get('status/{slug}', [PublicStatusController::class, 'show'])
+    ->name('status.public');
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/user', fn (Request $request) => $request->user());
@@ -33,4 +39,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::post('incidents/{incident}/acknowledge', [IncidentController::class, 'acknowledge'])
         ->name('incidents.acknowledge');
+
+    Route::post('status-pages/{statusPage}/monitors', [StatusPageController::class, 'syncMonitors'])
+        ->name('status-pages.monitors.sync');
+
+    Route::apiResource('status-pages', StatusPageController::class)
+        ->parameters(['status-pages' => 'statusPage']);
 });

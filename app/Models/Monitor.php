@@ -40,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Incident> $openIncidents
  * @property-read Collection<int, AlertChannel> $alertChannels
  * @property-read Collection<int, StatusPage> $statusPages
+ * @property-read MonitorStatusPage $pivot
  */
 #[Fillable([
     'name',
@@ -155,10 +156,11 @@ class Monitor extends Model
         return $this->belongsToMany(AlertChannel::class);
     }
 
-    /** @return BelongsToMany<StatusPage, $this> */
+    /** @return BelongsToMany<StatusPage, $this, MonitorStatusPage> */
     public function statusPages(): BelongsToMany
     {
         return $this->belongsToMany(StatusPage::class)
+            ->using(MonitorStatusPage::class)
             ->withPivot(['display_name', 'sort_order']);
     }
 }

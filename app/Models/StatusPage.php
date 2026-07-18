@@ -48,10 +48,11 @@ class StatusPage extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** @return BelongsToMany<Monitor, $this> */
+    /** @return BelongsToMany<Monitor, $this, MonitorStatusPage> */
     public function monitors(): BelongsToMany
     {
         return $this->belongsToMany(Monitor::class)
+            ->using(MonitorStatusPage::class)
             ->withPivot(['display_name', 'sort_order'])
             ->orderByPivot('sort_order');
     }

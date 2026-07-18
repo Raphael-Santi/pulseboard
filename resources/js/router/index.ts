@@ -26,6 +26,18 @@ export const router = createRouter({
             meta: { auth: true },
         },
         {
+            path: '/status-pages',
+            name: 'status-pages',
+            component: () => import('@/pages/StatusPagesPage.vue'),
+            meta: { auth: true },
+        },
+        {
+            // Public status page — no auth guard.
+            path: '/status/:slug',
+            name: 'status.public',
+            component: () => import('@/pages/PublicStatusPage.vue'),
+        },
+        {
             path: '/monitors/new',
             name: 'monitors.create',
             component: () => import('@/pages/MonitorFormPage.vue'),

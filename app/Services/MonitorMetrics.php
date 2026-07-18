@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\CheckStatus;
 use App\Models\Monitor;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
@@ -79,6 +80,45 @@ class MonitorMetrics
             $series[] = [
                 't' => $since->copy()->addSeconds($index * $bucketSeconds)->toIso8601String(),
                 'avg_ms' => (int) round($bucket['sum'] / $bucket['count']),
+            ];
+        }
+
+        return $series;
+    }
+
+    /**
+     * Uptime percentage per calendar day for the last `$days` days, oldest
+     * first. Days without any checks report null. Grouping uses the portable
+     * SQL `date()` function, which exists on both SQLite and MySQL.
+     *
+     * @return list<array{date: string, uptime: float|null}>
+     */
+    public function dailyUptime(Monitor $monitor, int $days): array
+    {
+        $start = CarbonImmutable::today()->subDays($days - 1);
+
+        $rows = $monitor->checkResults()
+            ->where('checked_at', '>=', $start)
+            ->toBase()
+            ->selectRaw('date(checked_at) as day, count(*) as total, sum(case when status = ? then 1 else 0 end) as ok_count', [
+                CheckStatus::Ok->value,
+            ])
+            ->groupBy('day')
+            ->get()
+            ->keyBy('day');
+
+        $series = [];
+
+        for ($offset = 0; $offset < $days; $offset++) {
+            $date = $start->addDays($offset)->toDateString();
+            $row = $rows->get($date);
+
+            $total = (int) ($row->total ?? 0);
+            $ok = (int) ($row->ok_count ?? 0);
+
+            $series[] = [
+                'date' => $date,
+                'uptime' => $total > 0 ? round($ok / $total * 100, 2) : null,
             ];
         }
 

@@ -65,6 +65,12 @@ function statusBadge(monitor: Monitor): StatusBadge {
             <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
                 <span class="text-sm font-medium tracking-widest text-emerald-400">PULSEBOARD</span>
                 <div class="flex items-center gap-4 text-sm">
+                    <RouterLink
+                        :to="{ name: 'status-pages' }"
+                        class="text-slate-400 hover:text-emerald-400"
+                    >
+                        Status pages
+                    </RouterLink>
                     <span class="text-slate-400">{{ auth.user?.email }}</span>
                     <button
                         type="button"
