@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\MonitorType;
+use Carbon\CarbonInterface;
 use Database\Factories\MonitorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Collection;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -32,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $user
+ * @property-read CheckResult|null $latestCheck
  * @property-read Collection<int, CheckResult> $checkResults
  * @property-read Collection<int, Incident> $incidents
  * @property-read Collection<int, AlertChannel> $alertChannels
@@ -87,6 +90,28 @@ class Monitor extends Model
     public function checkResults(): HasMany
     {
         return $this->hasMany(CheckResult::class);
+    }
+
+    /** @return HasOne<CheckResult, $this> */
+    public function latestCheck(): HasOne
+    {
+        return $this->hasOne(CheckResult::class)->latestOfMany('checked_at');
+    }
+
+    /**
+     * Whether this monitor is overdue for a check: it has never been checked,
+     * or its most recent check is older than the configured interval. Relies
+     * on `latestCheck` being loaded to avoid an N+1 query in the scheduler.
+     */
+    public function isDue(CarbonInterface $now): bool
+    {
+        $latest = $this->latestCheck;
+
+        if ($latest === null) {
+            return true;
+        }
+
+        return $latest->checked_at->addSeconds($this->interval_sec)->lessThanOrEqualTo($now);
     }
 
     /** @return HasMany<Incident, $this> */

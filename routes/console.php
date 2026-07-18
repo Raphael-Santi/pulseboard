@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// The scheduler picks which monitors are due each minute; the executors run in
+// queue workers, so a slow target never blocks the tick.
+Schedule::command('monitors:dispatch-due')->everyMinute()->withoutOverlapping();
+
+Schedule::command('checks:prune')->dailyAt('03:00');
