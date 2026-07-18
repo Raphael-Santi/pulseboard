@@ -37,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property-read CheckResult|null $latestCheck
  * @property-read Collection<int, CheckResult> $checkResults
  * @property-read Collection<int, Incident> $incidents
+ * @property-read Collection<int, Incident> $openIncidents
  * @property-read Collection<int, AlertChannel> $alertChannels
  * @property-read Collection<int, StatusPage> $statusPages
  */
@@ -118,6 +119,12 @@ class Monitor extends Model
     public function incidents(): HasMany
     {
         return $this->hasMany(Incident::class);
+    }
+
+    /** @return HasMany<Incident, $this> */
+    public function openIncidents(): HasMany
+    {
+        return $this->incidents()->whereNull('closed_at');
     }
 
     /** @return BelongsToMany<AlertChannel, $this> */

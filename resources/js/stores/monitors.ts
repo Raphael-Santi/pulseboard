@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
 import { http } from '@/lib/http';
-import type { Monitor, MonitorInput } from '@/types/monitor';
+import type { CheckRecordedEvent, IncidentEvent, Monitor, MonitorInput } from '@/types/monitor';
 
 export const useMonitorsStore = defineStore('monitors', () => {
     const monitors = ref<Monitor[]>([]);
@@ -53,5 +53,42 @@ export const useMonitorsStore = defineStore('monitors', () => {
         }
     }
 
-    return { monitors, loading, loaded, fetchAll, create, update, togglePause, remove, find };
+    // --- Real-time mutations, applied from broadcast events. ---
+
+    function applyCheckResult(event: CheckRecordedEvent): void {
+        const monitor = find(event.monitor_id);
+        if (monitor) {
+            monitor.latest_status = event.status;
+            monitor.last_checked_at = event.checked_at;
+        }
+    }
+
+    function applyIncidentOpened(event: IncidentEvent): void {
+        const monitor = find(event.monitor_id);
+        if (monitor) {
+            monitor.has_open_incident = true;
+        }
+    }
+
+    function applyIncidentClosed(event: IncidentEvent): void {
+        const monitor = find(event.monitor_id);
+        if (monitor) {
+            monitor.has_open_incident = false;
+        }
+    }
+
+    return {
+        monitors,
+        loading,
+        loaded,
+        fetchAll,
+        create,
+        update,
+        togglePause,
+        remove,
+        find,
+        applyCheckResult,
+        applyIncidentOpened,
+        applyIncidentClosed,
+    };
 });

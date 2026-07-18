@@ -30,6 +30,9 @@ class MonitorResource extends JsonResource
             'timeout_sec' => $this->timeout_sec,
             'failure_threshold' => $this->failure_threshold,
             'is_paused' => $this->is_paused,
+            'latest_status' => $this->latestCheck?->status->value,
+            'last_checked_at' => $this->latestCheck?->checked_at,
+            'has_open_incident' => $this->openIncidents->isNotEmpty(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

@@ -6,6 +6,8 @@ namespace App\Services;
 
 use App\Enums\CheckStatus;
 use App\Enums\IncidentUpdateStatus;
+use App\Events\IncidentClosed;
+use App\Events\IncidentOpened;
 use App\Models\AlertChannel;
 use App\Models\CheckResult;
 use App\Models\Incident;
@@ -53,6 +55,8 @@ class IncidentManager
             'message' => $result->error ?? 'Monitor is failing its checks.',
         ]);
 
+        IncidentOpened::dispatch($monitor, $incident);
+
         $this->notify($monitor, new MonitorDownNotification($incident));
     }
 
@@ -73,6 +77,8 @@ class IncidentManager
             'status' => IncidentUpdateStatus::Resolved,
             'message' => 'Monitor is responding again.',
         ]);
+
+        IncidentClosed::dispatch($monitor, $incident);
 
         $this->notify($monitor, new MonitorRecoveredNotification($incident));
     }

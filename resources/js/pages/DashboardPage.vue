@@ -1,14 +1,25 @@
 <script setup lang="ts">
+import { useEcho } from '@laravel/echo-vue';
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useAuthStore } from '@/stores/auth';
 import { useMonitorsStore } from '@/stores/monitors';
-import type { Monitor } from '@/types/monitor';
+import type { CheckRecordedEvent, IncidentEvent, Monitor } from '@/types/monitor';
 
 const auth = useAuthStore();
 const monitors = useMonitorsStore();
 const router = useRouter();
+
+const channel = `monitors.${auth.user?.id ?? 0}`;
+
+// Live updates: the executor records a check → the server broadcasts, and the
+// dashboard flips the monitor's status without a refresh.
+useEcho<CheckRecordedEvent>(channel, '.check.recorded', (event) =>
+    monitors.applyCheckResult(event),
+);
+useEcho<IncidentEvent>(channel, '.incident.opened', (event) => monitors.applyIncidentOpened(event));
+useEcho<IncidentEvent>(channel, '.incident.closed', (event) => monitors.applyIncidentClosed(event));
 
 onMounted(() => {
     void monitors.fetchAll();
@@ -27,6 +38,24 @@ async function remove(monitor: Monitor): Promise<void> {
     if (window.confirm(`Delete monitor “${monitor.name}”?`)) {
         await monitors.remove(monitor.id);
     }
+}
+
+interface StatusBadge {
+    text: string;
+    classes: string;
+}
+
+function statusBadge(monitor: Monitor): StatusBadge {
+    if (monitor.is_paused) {
+        return { text: 'Paused', classes: 'bg-slate-800 text-slate-400' };
+    }
+    if (monitor.has_open_incident || monitor.latest_status === 'failed') {
+        return { text: 'Down', classes: 'bg-red-950 text-red-400' };
+    }
+    if (monitor.latest_status === 'ok') {
+        return { text: 'Up', classes: 'bg-emerald-950 text-emerald-400' };
+    }
+    return { text: 'Unknown', classes: 'bg-slate-800 text-slate-500' };
 }
 </script>
 
@@ -53,7 +82,7 @@ async function remove(monitor: Monitor): Promise<void> {
                 <div>
                     <h1 class="text-2xl font-semibold">Monitors</h1>
                     <p class="mt-1 text-sm text-slate-400">
-                        Endpoints Pulseboard checks on a schedule.
+                        Live status — updates over WebSockets as checks run.
                     </p>
                 </div>
                 <RouterLink
@@ -80,36 +109,28 @@ async function remove(monitor: Monitor): Promise<void> {
                 <table class="w-full text-left text-sm">
                     <thead class="bg-slate-900 text-slate-400">
                         <tr>
+                            <th class="px-4 py-3 font-medium">Status</th>
                             <th class="px-4 py-3 font-medium">Name</th>
                             <th class="px-4 py-3 font-medium">Type</th>
                             <th class="px-4 py-3 font-medium">Target</th>
-                            <th class="px-4 py-3 font-medium">Interval</th>
-                            <th class="px-4 py-3 font-medium">Status</th>
                             <th class="px-4 py-3 text-right font-medium">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
                         <tr v-for="monitor in monitors.monitors" :key="monitor.id">
+                            <td class="px-4 py-3">
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-xs font-medium"
+                                    :class="statusBadge(monitor).classes"
+                                >
+                                    {{ statusBadge(monitor).text }}
+                                </span>
+                            </td>
                             <td class="px-4 py-3 font-medium text-slate-100">{{ monitor.name }}</td>
                             <td class="px-4 py-3 text-slate-400 uppercase">{{ monitor.type }}</td>
                             <td class="max-w-xs truncate px-4 py-3 text-slate-400">
                                 {{ monitor.target
                                 }}<template v-if="monitor.port">:{{ monitor.port }}</template>
-                            </td>
-                            <td class="px-4 py-3 text-slate-400">{{ monitor.interval_sec }}s</td>
-                            <td class="px-4 py-3">
-                                <span
-                                    v-if="monitor.is_paused"
-                                    class="rounded-full bg-amber-950 px-2 py-0.5 text-xs text-amber-400"
-                                >
-                                    Paused
-                                </span>
-                                <span
-                                    v-else
-                                    class="rounded-full bg-emerald-950 px-2 py-0.5 text-xs text-emerald-400"
-                                >
-                                    Active
-                                </span>
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex justify-end gap-3 text-xs">

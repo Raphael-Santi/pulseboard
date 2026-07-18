@@ -27,7 +27,12 @@ class MonitorController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return MonitorResource::collection($user->monitors()->latest()->get());
+        $monitors = $user->monitors()
+            ->with(['latestCheck', 'openIncidents'])
+            ->latest()
+            ->get();
+
+        return MonitorResource::collection($monitors);
     }
 
     /**

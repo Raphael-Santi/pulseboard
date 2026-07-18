@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Checks\CheckExecutorFactory;
+use App\Events\CheckResultRecorded;
 use App\Models\Monitor;
 use App\Services\IncidentManager;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -30,6 +31,8 @@ class RunCheckJob implements ShouldQueue
             'error' => $outcome->error,
             'checked_at' => now(),
         ]);
+
+        CheckResultRecorded::dispatch($this->monitor, $result);
 
         $incidents->record($this->monitor, $result);
     }

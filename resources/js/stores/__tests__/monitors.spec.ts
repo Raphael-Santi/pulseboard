@@ -26,6 +26,9 @@ function monitor(overrides: Partial<Monitor> = {}): Monitor {
         timeout_sec: 10,
         failure_threshold: 3,
         is_paused: false,
+        latest_status: null,
+        last_checked_at: null,
+        has_open_incident: false,
         created_at: '',
         updated_at: '',
         ...overrides,
@@ -103,5 +106,31 @@ describe('monitors store', () => {
         await store.remove(1);
 
         expect(store.monitors.map((item) => item.id)).toEqual([2]);
+    });
+
+    it('applies a broadcast check result to the live status', () => {
+        const store = useMonitorsStore();
+        store.monitors.push(monitor({ id: 1, latest_status: null }));
+
+        store.applyCheckResult({
+            monitor_id: 1,
+            status: 'failed',
+            latency_ms: null,
+            checked_at: '2026-07-18T10:00:00Z',
+        });
+
+        expect(store.monitors[0]?.latest_status).toBe('failed');
+        expect(store.monitors[0]?.last_checked_at).toBe('2026-07-18T10:00:00Z');
+    });
+
+    it('toggles the open-incident flag from broadcast events', () => {
+        const store = useMonitorsStore();
+        store.monitors.push(monitor({ id: 1, has_open_incident: false }));
+
+        store.applyIncidentOpened({ monitor_id: 1, incident_id: 9 });
+        expect(store.monitors[0]?.has_open_incident).toBe(true);
+
+        store.applyIncidentClosed({ monitor_id: 1, incident_id: 9 });
+        expect(store.monitors[0]?.has_open_incident).toBe(false);
     });
 });
