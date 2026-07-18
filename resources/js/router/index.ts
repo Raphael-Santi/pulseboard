@@ -32,6 +32,12 @@ export const router = createRouter({
             meta: { auth: true },
         },
         {
+            path: '/heartbeats/new',
+            name: 'heartbeats.create',
+            component: () => import('@/pages/HeartbeatFormPage.vue'),
+            meta: { auth: true },
+        },
+        {
             path: '/monitors/:id',
             name: 'monitors.show',
             component: () => import('@/pages/MonitorDetailPage.vue'),

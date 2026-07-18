@@ -85,12 +85,20 @@ function statusBadge(monitor: Monitor): StatusBadge {
                         Live status — updates over WebSockets as checks run.
                     </p>
                 </div>
-                <RouterLink
-                    :to="{ name: 'monitors.create' }"
-                    class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
-                >
-                    New monitor
-                </RouterLink>
+                <div class="flex gap-2">
+                    <RouterLink
+                        :to="{ name: 'heartbeats.create' }"
+                        class="rounded-md border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-900"
+                    >
+                        New heartbeat
+                    </RouterLink>
+                    <RouterLink
+                        :to="{ name: 'monitors.create' }"
+                        class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+                    >
+                        New monitor
+                    </RouterLink>
+                </div>
             </div>
 
             <p v-if="monitors.loading" class="mt-8 text-slate-400">Loading…</p>

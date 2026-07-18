@@ -35,6 +35,24 @@ class IncidentManager
         $this->handleRecovery($monitor);
     }
 
+    /**
+     * Open an incident because a heartbeat monitor missed its expected ping
+     * within the grace period. Time-based, so it bypasses the consecutive
+     * failure threshold used by actively-checked monitors.
+     */
+    public function recordMissedHeartbeat(Monitor $monitor): void
+    {
+        if ($monitor->incidents()->whereNull('closed_at')->exists()) {
+            return;
+        }
+
+        $this->openIncident(
+            $monitor,
+            'Missed heartbeat',
+            'No heartbeat received within the expected interval and grace period.',
+        );
+    }
+
     private function handleFailure(Monitor $monitor, CheckResult $result): void
     {
         if ($monitor->incidents()->whereNull('closed_at')->exists()) {
@@ -45,14 +63,23 @@ class IncidentManager
             return;
         }
 
+        $this->openIncident(
+            $monitor,
+            $result->error ?? 'Check failed',
+            $result->error ?? 'Monitor is failing its checks.',
+        );
+    }
+
+    private function openIncident(Monitor $monitor, string $cause, string $message): void
+    {
         $incident = $monitor->incidents()->create([
             'opened_at' => now(),
-            'cause' => $result->error ?? 'Check failed',
+            'cause' => $cause,
         ]);
 
         $incident->updates()->create([
             'status' => IncidentUpdateStatus::Investigating,
-            'message' => $result->error ?? 'Monitor is failing its checks.',
+            'message' => $message,
         ]);
 
         IncidentOpened::dispatch($monitor, $incident);

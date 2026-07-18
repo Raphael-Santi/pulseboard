@@ -115,6 +115,28 @@ class Monitor extends Model
         return $latest->checked_at->addSeconds($this->interval_sec)->lessThanOrEqualTo($now);
     }
 
+    /**
+     * Whether this heartbeat monitor is overdue: no ping has arrived within its
+     * interval plus grace period. The baseline is the last ping, or creation
+     * time for a monitor that has never been pinged.
+     */
+    public function isHeartbeatMissed(CarbonInterface $now): bool
+    {
+        if ($this->type !== MonitorType::Heartbeat) {
+            return false;
+        }
+
+        $baseline = $this->last_ping_at ?? $this->created_at;
+
+        if ($baseline === null) {
+            return false;
+        }
+
+        return $baseline->copy()
+            ->addSeconds($this->interval_sec + ($this->grace_sec ?? 0))
+            ->lessThan($now);
+    }
+
     /** @return HasMany<Incident, $this> */
     public function incidents(): HasMany
     {

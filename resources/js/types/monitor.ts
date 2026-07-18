@@ -20,11 +20,20 @@ export interface Monitor {
     timeout_sec: number;
     failure_threshold: number;
     is_paused: boolean;
+    token: string | null;
+    grace_sec: number | null;
+    last_ping_at: string | null;
     latest_status: CheckStatus | null;
     last_checked_at: string | null;
     has_open_incident: boolean;
     created_at: string;
     updated_at: string;
+}
+
+export interface HeartbeatInput {
+    name: string;
+    interval_sec: number;
+    grace_sec: number;
 }
 
 export interface MonitorInput {

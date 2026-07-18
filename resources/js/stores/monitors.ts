@@ -3,7 +3,13 @@ import { ref } from 'vue';
 
 import { http } from '@/lib/http';
 import type { Incident, MetricsWindow, MonitorMetrics } from '@/types/metrics';
-import type { CheckRecordedEvent, IncidentEvent, Monitor, MonitorInput } from '@/types/monitor';
+import type {
+    CheckRecordedEvent,
+    HeartbeatInput,
+    IncidentEvent,
+    Monitor,
+    MonitorInput,
+} from '@/types/monitor';
 
 export const useMonitorsStore = defineStore('monitors', () => {
     const monitors = ref<Monitor[]>([]);
@@ -23,6 +29,12 @@ export const useMonitorsStore = defineStore('monitors', () => {
 
     async function create(input: MonitorInput): Promise<Monitor> {
         const { data } = await http.post<{ data: Monitor }>('/api/monitors', input);
+        monitors.value.unshift(data.data);
+        return data.data;
+    }
+
+    async function createHeartbeat(input: HeartbeatInput): Promise<Monitor> {
+        const { data } = await http.post<{ data: Monitor }>('/api/monitors/heartbeat', input);
         monitors.value.unshift(data.data);
         return data.data;
     }
@@ -120,6 +132,7 @@ export const useMonitorsStore = defineStore('monitors', () => {
         fetchIncidents,
         acknowledgeIncident,
         create,
+        createHeartbeat,
         update,
         togglePause,
         remove,

@@ -8,4 +8,6 @@ use Illuminate\Support\Facades\Schedule;
 // queue workers, so a slow target never blocks the tick.
 Schedule::command('monitors:dispatch-due')->everyMinute()->withoutOverlapping();
 
+Schedule::command('heartbeats:check-missed')->everyMinute()->withoutOverlapping();
+
 Schedule::command('checks:prune')->dailyAt('03:00');

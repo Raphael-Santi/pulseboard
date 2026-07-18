@@ -15,15 +15,19 @@ const monitorId = computed(() => Number(route.params.id));
 const monitor = ref<Monitor | null>(null);
 const metrics = ref<MonitorMetrics | null>(null);
 const incidents = ref<Incident[]>([]);
-const window = ref<MetricsWindow>('24h');
+const activeWindow = ref<MetricsWindow>('24h');
 const loading = ref(true);
 
+const pingUrl = computed(() =>
+    monitor.value?.token ? `${globalThis.location.origin}/api/hb/${monitor.value.token}` : null,
+);
+
 async function loadMetrics(): Promise<void> {
-    metrics.value = await store.fetchMetrics(monitorId.value, window.value);
+    metrics.value = await store.fetchMetrics(monitorId.value, activeWindow.value);
 }
 
 async function setWindow(next: MetricsWindow): Promise<void> {
-    window.value = next;
+    activeWindow.value = next;
     await loadMetrics();
 }
 
@@ -69,9 +73,26 @@ function formatUptime(value: number | null): string {
         <section v-else-if="monitor" class="mx-auto max-w-4xl px-6 py-10">
             <h1 class="text-2xl font-semibold">{{ monitor.name }}</h1>
             <p class="mt-1 text-sm text-slate-400">
-                {{ monitor.type.toUpperCase() }} · {{ monitor.target
-                }}<template v-if="monitor.port">:{{ monitor.port }}</template>
+                {{ monitor.type.toUpperCase() }}
+                <template v-if="monitor.target">
+                    · {{ monitor.target
+                    }}<template v-if="monitor.port">:{{ monitor.port }}</template>
+                </template>
             </p>
+
+            <div
+                v-if="monitor.type === 'heartbeat' && pingUrl"
+                class="mt-6 rounded-lg border border-slate-800 bg-slate-900/40 p-4"
+            >
+                <p class="text-xs tracking-wide text-slate-500 uppercase">Ping URL</p>
+                <code class="mt-1 block text-sm break-all text-emerald-300"
+                    >POST {{ pingUrl }}</code
+                >
+                <p class="mt-2 text-xs text-slate-500">
+                    Call this from your cron on schedule. A missed ping opens an incident after the
+                    grace period.
+                </p>
+            </div>
 
             <div class="mt-8 grid grid-cols-3 gap-4">
                 <div
@@ -96,7 +117,7 @@ function formatUptime(value: number | null): string {
                             type="button"
                             class="rounded-md px-2 py-1"
                             :class="
-                                window === option
+                                activeWindow === option
                                     ? 'bg-slate-800 text-emerald-400'
                                     : 'text-slate-400 hover:text-slate-200'
                             "

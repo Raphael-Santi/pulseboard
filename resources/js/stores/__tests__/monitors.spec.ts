@@ -26,6 +26,9 @@ function monitor(overrides: Partial<Monitor> = {}): Monitor {
         timeout_sec: 10,
         failure_threshold: 3,
         is_paused: false,
+        token: null,
+        grace_sec: null,
+        last_ping_at: null,
         latest_status: null,
         last_checked_at: null,
         has_open_incident: false,
@@ -132,6 +135,27 @@ describe('monitors store', () => {
 
         store.applyIncidentClosed({ monitor_id: 1, incident_id: 9 });
         expect(store.monitors[0]?.has_open_incident).toBe(false);
+    });
+
+    it('creates a heartbeat monitor via the dedicated endpoint', async () => {
+        mockedPost.mockResolvedValue({
+            data: { data: monitor({ id: 7, type: 'heartbeat', token: 'abc' }) },
+        });
+
+        const store = useMonitorsStore();
+        const created = await store.createHeartbeat({
+            name: 'Cron',
+            interval_sec: 3600,
+            grace_sec: 300,
+        });
+
+        expect(mockedPost).toHaveBeenCalledWith('/api/monitors/heartbeat', {
+            name: 'Cron',
+            interval_sec: 3600,
+            grace_sec: 300,
+        });
+        expect(created.token).toBe('abc');
+        expect(store.monitors[0]?.id).toBe(7);
     });
 
     it('requests metrics for the given window', async () => {
