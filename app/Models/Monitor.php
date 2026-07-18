@@ -54,6 +54,16 @@ class Monitor extends Model
     use HasFactory;
 
     /**
+     * Default attribute values so a freshly created model mirrors the
+     * database defaults without an extra refresh round-trip.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_paused' => false,
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
