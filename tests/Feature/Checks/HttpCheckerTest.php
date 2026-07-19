@@ -35,13 +35,15 @@ it('reports failed on a 5xx response and keeps the status in the error', functio
         ->and($outcome->error)->toContain('503');
 });
 
-it('reports failed when the connection cannot be established', function () {
-    Http::fake(fn () => throw new ConnectionException('cURL error 28: timed out'));
+it('reports failed with a target-free reason when the connection fails', function () {
+    // A real cURL error embeds the URL; the reason must not leak it publicly.
+    Http::fake(fn () => throw new ConnectionException('cURL error 6: Could not resolve host: secret.internal'));
 
-    $monitor = Monitor::factory()->make(['target' => 'https://example.com', 'timeout_sec' => 1]);
+    $monitor = Monitor::factory()->make(['target' => 'https://secret.internal', 'timeout_sec' => 1]);
 
     $outcome = (new HttpChecker)->check($monitor);
 
     expect($outcome->status)->toBe(CheckStatus::Failed)
-        ->and($outcome->error)->toContain('timed out');
+        ->and($outcome->error)->toContain('подключиться')
+        ->and($outcome->error)->not->toContain('secret.internal');
 });

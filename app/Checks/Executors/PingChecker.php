@@ -32,6 +32,7 @@ final class PingChecker implements CheckExecutor
             return CheckOutcome::ok($latencyMs);
         }
 
-        return CheckOutcome::failed("Host {$host} is unreachable");
+        // No target in the message: this reason is public on status pages.
+        return CheckOutcome::failed('Хост недоступен');
     }
 }

@@ -17,7 +17,9 @@ Route::post('hb/{token}', [HeartbeatController::class, 'ping'])
     ->name('heartbeat.ping');
 
 // Public: unauthenticated status page consumed by /status/{slug} in the SPA.
+// Throttled because each request runs a 90-day aggregate per component.
 Route::get('status/{slug}', [PublicStatusController::class, 'show'])
+    ->middleware('throttle:60,1')
     ->name('status.public');
 
 Route::middleware('auth:sanctum')->group(function (): void {

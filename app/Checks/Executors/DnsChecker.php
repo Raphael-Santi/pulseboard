@@ -24,7 +24,8 @@ final class DnsChecker implements CheckExecutor
         $latencyMs = (int) intdiv(hrtime(true) - $start, 1_000_000);
 
         if ($addresses === false || $addresses === []) {
-            return CheckOutcome::failed("Could not resolve {$host}");
+            // No target in the message: this reason is public on status pages.
+            return CheckOutcome::failed('Не удалось разрешить имя');
         }
 
         return CheckOutcome::ok($latencyMs);

@@ -23,7 +23,8 @@ it('reports failed when ping exits non-zero', function () {
     $outcome = (new PingChecker)->check($monitor);
 
     expect($outcome->status)->toBe(CheckStatus::Failed)
-        ->and($outcome->error)->toContain('unreachable');
+        ->and($outcome->error)->toContain('недоступен')
+        ->and($outcome->error)->not->toContain('10.255.255.1');
 });
 
 it('never passes the target through a shell', function () {

@@ -20,5 +20,7 @@ it('fails on a name that cannot resolve', function () {
     $outcome = (new DnsChecker)->check($monitor);
 
     expect($outcome->status)->toBe(CheckStatus::Failed)
-        ->and($outcome->error)->toContain('resolve');
+        ->and($outcome->error)->toContain('разрешить')
+        // The target must not leak into the reason (it is shown publicly).
+        ->and($outcome->error)->not->toContain('nonexistent-host.invalid');
 });

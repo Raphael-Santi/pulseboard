@@ -23,8 +23,10 @@ final class HttpChecker implements CheckExecutor
         try {
             $response = Http::timeout($monitor->timeout_sec)
                 ->get((string) $monitor->target);
-        } catch (ConnectionException $e) {
-            return CheckOutcome::failed($e->getMessage());
+        } catch (ConnectionException) {
+            // Deliberately generic: the raw cURL message embeds the target URL,
+            // and this reason is shown on the public status page.
+            return CheckOutcome::failed('Не удалось подключиться к цели');
         }
 
         $latencyMs = $this->elapsedMs($start);

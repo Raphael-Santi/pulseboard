@@ -30,9 +30,9 @@ final class TcpChecker implements CheckExecutor
         );
 
         if ($connection === false) {
-            return CheckOutcome::failed(
-                $errstr !== '' ? $errstr : "Connection failed (errno {$errno})",
-            );
+            // errstr can contain the resolved host; keep the public-facing
+            // reason generic and expose only the numeric errno.
+            return CheckOutcome::failed("Соединение не установлено (errno {$errno})");
         }
 
         $latencyMs = (int) intdiv(hrtime(true) - $start, 1_000_000);
