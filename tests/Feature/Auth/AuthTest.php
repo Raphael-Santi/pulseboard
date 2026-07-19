@@ -61,13 +61,14 @@ it('rate limits login after five failed attempts', function () {
         ])->assertUnprocessable();
     }
 
-    $response = $this->postJson('/login', [
+    // The 6th attempt uses the correct password, so being rejected proves the
+    // throttle fired. Asserted by key, not message text, to stay locale-agnostic.
+    $this->postJson('/login', [
         'email' => $user->email,
         'password' => 'password',
-    ]);
+    ])->assertUnprocessable()->assertJsonValidationErrors('email');
 
-    $response->assertUnprocessable();
-    expect($response->json('errors.email.0'))->toContain('Too many');
+    $this->assertGuest();
 });
 
 it('logs out the authenticated user', function () {

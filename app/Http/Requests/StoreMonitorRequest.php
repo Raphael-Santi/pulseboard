@@ -50,7 +50,7 @@ class StoreMonitorRequest extends FormRequest
             if ($this->integer('timeout_sec') >= $this->integer('interval_sec')) {
                 $validator->errors()->add(
                     'timeout_sec',
-                    'The timeout must be shorter than the check interval.',
+                    'Таймаут должен быть меньше интервала проверки.',
                 );
             }
         });
