@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import AppShell from '@/components/AppShell.vue';
@@ -33,6 +33,16 @@ const errors = ref<Record<string, string[]>>({});
 const processing = ref(false);
 
 const showPort = computed(() => form.type === 'tcp');
+
+// Port is only meaningful for TCP; drop a stale value when the type changes.
+watch(
+    () => form.type,
+    (type) => {
+        if (type !== 'tcp') {
+            form.port = null;
+        }
+    },
+);
 const targetLabel = computed(() =>
     form.type === 'dns' ? 'Домен' : form.type === 'http' ? 'URL' : 'Хост',
 );

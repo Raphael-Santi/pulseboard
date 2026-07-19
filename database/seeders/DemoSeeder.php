@@ -43,11 +43,11 @@ class DemoSeeder extends Seeder
         $end = CarbonImmutable::now();
 
         $definitions = [
-            ['name' => 'Marketing site', 'type' => MonitorType::Http, 'target' => 'https://example.com', 'port' => null, 'latency' => 90],
-            ['name' => 'Public API', 'type' => MonitorType::Http, 'target' => 'https://api.example.com/health', 'port' => null, 'latency' => 140],
-            ['name' => 'Primary database', 'type' => MonitorType::Tcp, 'target' => 'db.example.com', 'port' => 5432, 'latency' => 25],
-            ['name' => 'DNS resolution', 'type' => MonitorType::Dns, 'target' => 'example.com', 'port' => null, 'latency' => 40],
-            ['name' => 'Edge network', 'type' => MonitorType::Ping, 'target' => '1.1.1.1', 'port' => null, 'latency' => 15],
+            ['name' => 'Сайт-визитка', 'type' => MonitorType::Http, 'target' => 'https://example.com', 'port' => null, 'latency' => 90],
+            ['name' => 'Публичный API', 'type' => MonitorType::Http, 'target' => 'https://api.example.com/health', 'port' => null, 'latency' => 140],
+            ['name' => 'Основная база данных', 'type' => MonitorType::Tcp, 'target' => 'db.example.com', 'port' => 5432, 'latency' => 25],
+            ['name' => 'DNS-резолвинг', 'type' => MonitorType::Dns, 'target' => 'example.com', 'port' => null, 'latency' => 40],
+            ['name' => 'Пограничная сеть', 'type' => MonitorType::Ping, 'target' => '1.1.1.1', 'port' => null, 'latency' => 15],
         ];
 
         $monitors = [];
@@ -110,16 +110,16 @@ class DemoSeeder extends Seeder
             $incident = $monitor->incidents()->create([
                 'opened_at' => $openedAt,
                 'closed_at' => $closedAt,
-                'cause' => 'Connection timed out',
+                'cause' => 'Таймаут соединения',
             ]);
 
             $incident->updates()->create([
                 'status' => IncidentUpdateStatus::Investigating,
-                'message' => 'We are investigating connectivity problems.',
+                'message' => 'Расследуем проблемы со связью.',
             ]);
             $incident->updates()->create([
                 'status' => IncidentUpdateStatus::Resolved,
-                'message' => 'The monitor is responding normally again.',
+                'message' => 'Монитор снова отвечает штатно.',
             ]);
         }
     }
@@ -127,7 +127,7 @@ class DemoSeeder extends Seeder
     private function seedHeartbeat(User $user, CarbonImmutable $start, CarbonImmutable $end): Monitor
     {
         $monitor = new Monitor([
-            'name' => 'Nightly backup',
+            'name' => 'Ночной бэкап',
             'type' => MonitorType::Heartbeat,
             'interval_sec' => 86400,
             'grace_sec' => 3600,
@@ -162,7 +162,7 @@ class DemoSeeder extends Seeder
     {
         $page = $user->statusPages()->create([
             'slug' => 'pulseboard-demo',
-            'title' => 'Pulseboard Demo',
+            'title' => 'Статус сервисов Acme',
             'is_public' => true,
         ]);
 

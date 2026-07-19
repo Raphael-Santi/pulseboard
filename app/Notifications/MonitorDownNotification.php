@@ -39,16 +39,16 @@ class MonitorDownNotification extends Notification implements ShouldQueue, Teleg
 
         return (new MailMessage)
             ->error()
-            ->subject("[Pulseboard] {$monitor->name} is down")
-            ->line("{$monitor->name} failed its checks and an incident was opened.")
-            ->line("Cause: {$this->incident->cause}");
+            ->subject("[Pulseboard] {$monitor->name} недоступен")
+            ->line("{$monitor->name} не прошёл проверки — открыт инцидент.")
+            ->line("Причина: {$this->incident->cause}");
     }
 
     public function toTelegram(object $notifiable): string
     {
         $monitor = $this->incident->monitor;
 
-        return "🔴 *{$monitor->name} is down*\nCause: {$this->incident->cause}";
+        return "🔴 *{$monitor->name} недоступен*\nПричина: {$this->incident->cause}";
     }
 
     private function channelFor(object $notifiable): string

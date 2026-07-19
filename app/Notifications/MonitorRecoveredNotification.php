@@ -37,15 +37,15 @@ class MonitorRecoveredNotification extends Notification implements ShouldQueue, 
 
         return (new MailMessage)
             ->success()
-            ->subject("[Pulseboard] {$monitor->name} has recovered")
-            ->line("{$monitor->name} is responding again and the incident was closed.");
+            ->subject("[Pulseboard] {$monitor->name} восстановлен")
+            ->line("{$monitor->name} снова отвечает — инцидент закрыт.");
     }
 
     public function toTelegram(object $notifiable): string
     {
         $monitor = $this->incident->monitor;
 
-        return "🟢 *{$monitor->name} has recovered*\nThe incident is resolved.";
+        return "🟢 *{$monitor->name} восстановлен*\nИнцидент решён.";
     }
 
     private function channelFor(object $notifiable): string

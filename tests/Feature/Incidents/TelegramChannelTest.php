@@ -20,7 +20,7 @@ it('posts the message to the telegram bot api', function () {
     Http::assertSent(function ($request): bool {
         return str_contains($request->url(), 'bottest-token/sendMessage')
             && $request['chat_id'] === '987654'
-            && str_contains((string) $request['text'], 'is down');
+            && str_contains((string) $request['text'], 'недоступен');
     });
 });
 

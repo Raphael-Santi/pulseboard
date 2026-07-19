@@ -31,7 +31,7 @@ it('produces a presentable public status page from the seed', function () {
 
     $response = $this->getJson('/api/status/pulseboard-demo')->assertOk();
 
-    $response->assertJsonPath('title', 'Pulseboard Demo')
+    $response->assertJsonPath('title', 'Статус сервисов Acme')
         ->assertJsonCount(6, 'components')
         ->assertJsonCount(90, 'components.0.uptime');
 

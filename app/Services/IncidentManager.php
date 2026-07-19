@@ -48,8 +48,8 @@ class IncidentManager
 
         $this->openIncident(
             $monitor,
-            'Missed heartbeat',
-            'No heartbeat received within the expected interval and grace period.',
+            'Пропущенный heartbeat',
+            'Пинг не пришёл в ожидаемый интервал и льготный период.',
         );
     }
 
@@ -65,8 +65,8 @@ class IncidentManager
 
         $this->openIncident(
             $monitor,
-            $result->error ?? 'Check failed',
-            $result->error ?? 'Monitor is failing its checks.',
+            $result->error ?? 'Проверка не пройдена',
+            $result->error ?? 'Монитор не проходит проверки.',
         );
     }
 
@@ -102,7 +102,7 @@ class IncidentManager
 
         $incident->updates()->create([
             'status' => IncidentUpdateStatus::Resolved,
-            'message' => 'Monitor is responding again.',
+            'message' => 'Монитор снова отвечает.',
         ]);
 
         IncidentClosed::dispatch($monitor, $incident);
