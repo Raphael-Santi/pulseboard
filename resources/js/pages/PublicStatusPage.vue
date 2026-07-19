@@ -1,24 +1,53 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
+import BrandMark from '@/components/BrandMark.vue';
 import UptimeBar from '@/components/UptimeBar.vue';
+import { useTheme } from '@/composables/useTheme';
+import { formatDateTime } from '@/lib/time';
 import { useStatusPagesStore } from '@/stores/statusPages';
-import type { OverallStatus, PublicStatus } from '@/types/status';
+import type { OverallStatus, PublicStatus, StatusComponent } from '@/types/status';
 
 const route = useRoute();
 const store = useStatusPagesStore();
+const { theme, toggle } = useTheme();
 
 const status = ref<PublicStatus | null>(null);
 const loading = ref(true);
 const notFound = ref(false);
 
-const overall = computed<Record<OverallStatus, { text: string; classes: string }>>(() => ({
-    operational: { text: 'All systems operational', classes: 'bg-emerald-950 text-emerald-400' },
-    degraded: { text: 'Partial outage', classes: 'bg-amber-950 text-amber-400' },
-    down: { text: 'Major outage', classes: 'bg-red-950 text-red-400' },
-    unknown: { text: 'Status unknown', classes: 'bg-slate-800 text-slate-400' },
-}));
+const overallMeta: Record<OverallStatus, { label: string; pill: string; glyph: string }> = {
+    operational: { label: 'Все системы работают', pill: 'bg-up-soft text-up', glyph: '✓' },
+    degraded: { label: 'Частичный сбой', pill: 'bg-warn-soft text-warn', glyph: '!' },
+    down: { label: 'Крупный сбой', pill: 'bg-down-soft text-down', glyph: '!' },
+    unknown: { label: 'Статус неизвестен', pill: 'bg-unknown-soft text-fg-muted', glyph: '?' },
+};
+
+const componentLabel: Record<string, string> = {
+    operational: 'Работает',
+    down: 'Не работает',
+    unknown: 'Неизвестно',
+};
+
+function componentDot(componentStatus: string): string {
+    return (
+        {
+            operational: 'bg-up',
+            down: 'bg-down',
+            unknown: 'bg-unknown',
+        }[componentStatus] ?? 'bg-unknown'
+    );
+}
+
+function uptime90(component: StatusComponent): string {
+    const values = component.uptime.map((day) => day.uptime).filter((v): v is number => v !== null);
+    if (values.length === 0) {
+        return '—';
+    }
+    const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+    return `${avg.toFixed(2)}%`;
+}
 
 onMounted(async () => {
     try {
@@ -29,92 +58,123 @@ onMounted(async () => {
         loading.value = false;
     }
 });
-
-function componentDot(componentStatus: string): string {
-    return (
-        {
-            operational: 'bg-emerald-500',
-            down: 'bg-red-500',
-            unknown: 'bg-slate-600',
-        }[componentStatus] ?? 'bg-slate-600'
-    );
-}
 </script>
 
 <template>
-    <main class="min-h-screen bg-slate-950 px-6 py-12 text-slate-100">
-        <div class="mx-auto max-w-3xl">
-            <p v-if="loading" class="text-slate-400">Loading…</p>
+    <main class="min-h-screen bg-bg text-fg">
+        <div class="mx-auto max-w-[760px] px-5 py-[clamp(32px,6vw,64px)]">
+            <div class="mb-[clamp(28px,5vw,44px)] flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <BrandMark :size="19" />
+                    <span class="text-lg font-bold">{{ status?.title ?? 'Pulseboard' }}</span>
+                </div>
+                <button
+                    type="button"
+                    class="flex h-9 w-9 items-center justify-center rounded-[10px] border border-border bg-surface text-fg-muted"
+                    @click="toggle"
+                >
+                    {{ theme === 'dark' ? '☾' : '☀' }}
+                </button>
+            </div>
 
-            <p v-else-if="notFound" class="text-slate-400">This status page does not exist.</p>
+            <p v-if="loading" class="text-fg-muted">Загрузка…</p>
+            <p v-else-if="notFound" class="text-fg-muted">Такой статус-страницы не существует.</p>
 
             <template v-else-if="status">
-                <h1 class="text-3xl font-semibold">{{ status.title }}</h1>
+                <!-- Overall banner -->
                 <div
-                    class="mt-4 inline-flex rounded-md px-3 py-1.5 text-sm font-medium"
-                    :class="overall[status.overall_status].classes"
+                    class="mb-4 flex items-center gap-4 rounded-2xl p-[clamp(20px,4vw,28px)]"
+                    :class="overallMeta[status.overall_status].pill"
                 >
-                    {{ overall[status.overall_status].text }}
+                    <div
+                        class="flex h-13 w-13 flex-none items-center justify-center rounded-2xl text-2xl font-bold"
+                        :class="
+                            componentDot(
+                                status.overall_status === 'operational'
+                                    ? 'operational'
+                                    : status.overall_status === 'down'
+                                      ? 'down'
+                                      : 'unknown',
+                            )
+                        "
+                    >
+                        <span class="text-white">{{
+                            overallMeta[status.overall_status].glyph
+                        }}</span>
+                    </div>
+                    <h1 class="text-[clamp(20px,3.5vw,26px)] font-bold tracking-tight">
+                        {{ overallMeta[status.overall_status].label }}
+                    </h1>
                 </div>
 
-                <section class="mt-10 space-y-4">
+                <!-- Components -->
+                <div class="mb-7 overflow-hidden rounded-2xl border border-border bg-surface">
                     <div
                         v-for="component in status.components"
                         :key="component.name"
-                        class="rounded-lg border border-slate-800 p-4"
+                        class="border-b border-border p-5 last:border-b-0"
                     >
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <span class="font-semibold">{{ component.name }}</span>
+                            <span class="flex items-center gap-2 text-[13px] font-semibold">
                                 <span
-                                    class="h-2.5 w-2.5 rounded-full"
+                                    class="h-2 w-2 rounded-full"
                                     :class="componentDot(component.status)"
                                 />
-                                <span class="font-medium">{{ component.name }}</span>
-                            </div>
-                            <span class="text-xs text-slate-500 capitalize">
-                                {{ component.status }}
+                                {{ componentLabel[component.status] ?? component.status }}
                             </span>
                         </div>
-                        <div class="mt-3 overflow-x-auto">
-                            <UptimeBar :days="component.uptime" />
+                        <UptimeBar :days="component.uptime" />
+                        <div class="mt-2 flex justify-between text-[11.5px] text-fg-subtle">
+                            <span>90 дней назад</span>
+                            <span>аптайм {{ uptime90(component) }}</span>
+                            <span>сегодня</span>
                         </div>
-                        <p class="mt-1 text-xs text-slate-600">90-day history</p>
                     </div>
-                </section>
+                </div>
 
-                <section class="mt-10">
-                    <h2 class="text-sm font-medium text-slate-300">Recent incidents</h2>
-                    <p v-if="status.incidents.length === 0" class="mt-3 text-sm text-slate-500">
-                        No incidents reported.
-                    </p>
-                    <ul v-else class="mt-3 space-y-3">
-                        <li
-                            v-for="(incident, index) in status.incidents"
-                            :key="index"
-                            class="rounded-lg border border-slate-800 p-4"
-                        >
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-slate-200">
-                                    {{ incident.cause }}
-                                </span>
-                                <span
-                                    class="rounded-full px-2 py-0.5 text-xs"
-                                    :class="
-                                        incident.closed_at
-                                            ? 'bg-slate-800 text-slate-400'
-                                            : 'bg-red-950 text-red-400'
-                                    "
-                                >
-                                    {{ incident.closed_at ? 'Resolved' : 'Ongoing' }}
-                                </span>
-                            </div>
-                            <p class="mt-1 text-xs text-slate-500">{{ incident.opened_at }}</p>
-                        </li>
-                    </ul>
-                </section>
+                <!-- Incidents -->
+                <h2 class="mb-3.5 text-[17px] font-semibold">Недавние инциденты</h2>
+                <div
+                    v-if="status.incidents.length === 0"
+                    class="rounded-2xl border border-border bg-surface p-7 text-center text-sm text-fg-subtle"
+                >
+                    За последние 90 дней инцидентов не было.
+                </div>
+                <div v-else class="flex flex-col gap-3">
+                    <div
+                        v-for="(incident, index) in status.incidents"
+                        :key="index"
+                        class="rounded-2xl border border-border bg-surface p-4"
+                        :style="{
+                            borderLeft: `3px solid ${incident.closed_at ? 'var(--color-unknown)' : 'var(--color-down)'}`,
+                        }"
+                    >
+                        <div class="mb-1.5 flex flex-wrap items-center gap-2.5">
+                            <span
+                                class="rounded-md px-2 py-0.5 text-[11.5px] font-bold"
+                                :class="
+                                    incident.closed_at
+                                        ? 'bg-unknown-soft text-fg-muted'
+                                        : 'bg-down-soft text-down'
+                                "
+                            >
+                                {{ incident.closed_at ? 'Решён' : 'Идёт сейчас' }}
+                            </span>
+                            <span class="text-[14.5px] font-semibold">{{ incident.cause }}</span>
+                        </div>
+                        <div class="text-[13px] text-fg-muted">
+                            {{ formatDateTime(incident.opened_at) }}
+                            <template v-if="incident.closed_at">
+                                — {{ formatDateTime(incident.closed_at) }}
+                            </template>
+                        </div>
+                    </div>
+                </div>
 
-                <footer class="mt-12 text-center text-xs text-slate-600">
-                    Powered by Pulseboard
+                <footer class="mt-10 text-center text-[12.5px] text-fg-subtle">
+                    Работает на
+                    <RouterLink to="/" class="font-semibold text-accent">Pulseboard</RouterLink>
                 </footer>
             </template>
         </div>

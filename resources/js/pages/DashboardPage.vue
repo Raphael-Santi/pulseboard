@@ -1,186 +1,331 @@
 <script setup lang="ts">
 import { useEcho } from '@laravel/echo-vue';
-import { onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import AppShell from '@/components/AppShell.vue';
+import StatusBadge from '@/components/StatusBadge.vue';
+import { monitorStatus, STATUS_META, typeLabel } from '@/lib/status';
+import { relativeTime } from '@/lib/time';
 import { useAuthStore } from '@/stores/auth';
 import { useMonitorsStore } from '@/stores/monitors';
+import { useUiStore } from '@/stores/ui';
 import type { CheckRecordedEvent, IncidentEvent, Monitor } from '@/types/monitor';
 
 const auth = useAuthStore();
 const monitors = useMonitorsStore();
+const ui = useUiStore();
 const router = useRouter();
+
+const view = ref<'list' | 'cards'>('list');
+const flashId = ref<number | null>(null);
 
 const channel = `monitors.${auth.user?.id ?? 0}`;
 
-// Live updates: the executor records a check → the server broadcasts, and the
-// dashboard flips the monitor's status without a refresh.
-useEcho<CheckRecordedEvent>(channel, '.check.recorded', (event) =>
-    monitors.applyCheckResult(event),
-);
-useEcho<IncidentEvent>(channel, '.incident.opened', (event) => monitors.applyIncidentOpened(event));
-useEcho<IncidentEvent>(channel, '.incident.closed', (event) => monitors.applyIncidentClosed(event));
+function flash(id: number): void {
+    flashId.value = id;
+    setTimeout(() => {
+        if (flashId.value === id) {
+            flashId.value = null;
+        }
+    }, 1600);
+}
+
+useEcho<CheckRecordedEvent>(channel, '.check.recorded', (event) => {
+    monitors.applyCheckResult(event);
+    flash(event.monitor_id);
+});
+useEcho<IncidentEvent>(channel, '.incident.opened', (event) => {
+    monitors.applyIncidentOpened(event);
+    ui.notify(`${monitors.find(event.monitor_id)?.name ?? 'Монитор'} — открыт инцидент`, 'down');
+});
+useEcho<IncidentEvent>(channel, '.incident.closed', (event) => {
+    monitors.applyIncidentClosed(event);
+    ui.notify(`${monitors.find(event.monitor_id)?.name ?? 'Монитор'} восстановлен`, 'up');
+});
 
 onMounted(() => {
     void monitors.fetchAll();
 });
 
-async function logout(): Promise<void> {
-    await auth.logout();
-    await router.push({ name: 'home' });
+const summary = computed(() => {
+    const list = monitors.monitors;
+    return [
+        {
+            label: 'Работают',
+            value: list.filter((m) => monitorStatus(m) === 'up').length,
+            dot: 'bg-up',
+        },
+        {
+            label: 'Не работают',
+            value: list.filter((m) => monitorStatus(m) === 'down').length,
+            dot: 'bg-down',
+        },
+        { label: 'На паузе', value: list.filter((m) => m.is_paused).length, dot: 'bg-unknown' },
+        { label: 'Всего', value: list.length, dot: 'bg-fg-subtle' },
+    ];
+});
+
+function statusMeta(monitor: Monitor) {
+    return STATUS_META[monitorStatus(monitor)];
+}
+
+function latency(monitor: Monitor): string {
+    return monitor.latest_latency_ms === null ? '—' : `${monitor.latest_latency_ms} мс`;
+}
+
+function open(monitor: Monitor): void {
+    void router.push({ name: 'monitors.show', params: { id: monitor.id } });
+}
+
+function edit(monitor: Monitor): void {
+    void router.push({ name: 'monitors.edit', params: { id: monitor.id } });
 }
 
 async function togglePause(monitor: Monitor): Promise<void> {
     await monitors.togglePause(monitor.id);
+    ui.notify(monitor.is_paused ? 'Монитор снят с паузы' : 'Монитор поставлен на паузу');
 }
 
 async function remove(monitor: Monitor): Promise<void> {
-    if (window.confirm(`Delete monitor “${monitor.name}”?`)) {
+    const confirmed = await ui.confirm({
+        title: 'Удалить монитор?',
+        body: `«${monitor.name}» и вся его история будут удалены безвозвратно.`,
+    });
+    if (confirmed) {
         await monitors.remove(monitor.id);
+        ui.notify('Монитор удалён', 'down');
     }
-}
-
-interface StatusBadge {
-    text: string;
-    classes: string;
-}
-
-function statusBadge(monitor: Monitor): StatusBadge {
-    if (monitor.is_paused) {
-        return { text: 'Paused', classes: 'bg-slate-800 text-slate-400' };
-    }
-    if (monitor.has_open_incident || monitor.latest_status === 'failed') {
-        return { text: 'Down', classes: 'bg-red-950 text-red-400' };
-    }
-    if (monitor.latest_status === 'ok') {
-        return { text: 'Up', classes: 'bg-emerald-950 text-emerald-400' };
-    }
-    return { text: 'Unknown', classes: 'bg-slate-800 text-slate-500' };
 }
 </script>
 
 <template>
-    <main class="min-h-screen bg-slate-950 text-slate-100">
-        <header class="border-b border-slate-800">
-            <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-                <span class="text-sm font-medium tracking-widest text-emerald-400">PULSEBOARD</span>
-                <div class="flex items-center gap-4 text-sm">
-                    <RouterLink
-                        :to="{ name: 'status-pages' }"
-                        class="text-slate-400 hover:text-emerald-400"
-                    >
-                        Status pages
-                    </RouterLink>
-                    <span class="text-slate-400">{{ auth.user?.email }}</span>
+    <AppShell>
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <h1 class="text-[26px] font-semibold tracking-tight">Дашборд</h1>
+                <div class="mt-1.5 flex items-center gap-2 text-[13px] text-fg-subtle">
+                    <span class="pb-blink h-1.5 w-1.5 rounded-full bg-up" />
+                    <span class="font-mono">обновления в реальном времени</span>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2.5">
+                <RouterLink
+                    :to="{ name: 'heartbeats.create' }"
+                    class="rounded-[10px] border border-border-strong bg-surface px-4 py-2.5 text-sm font-semibold text-fg"
+                >
+                    + Heartbeat
+                </RouterLink>
+                <RouterLink
+                    :to="{ name: 'monitors.create' }"
+                    class="rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                    + Новый монитор
+                </RouterLink>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div
+            v-if="monitors.loading"
+            class="mt-6 overflow-hidden rounded-2xl border border-border bg-surface"
+        >
+            <div
+                v-for="n in 6"
+                :key="n"
+                class="pb-skeleton flex items-center gap-4 border-b border-border px-5 py-4 last:border-b-0"
+            >
+                <span class="h-6 w-6 flex-none rounded-lg bg-surface-2" />
+                <span class="h-3 w-2/5 rounded bg-surface-2" />
+                <span class="ml-auto h-3 w-16 rounded bg-surface-2" />
+            </div>
+        </div>
+
+        <!-- Empty -->
+        <div
+            v-else-if="monitors.monitors.length === 0"
+            class="mt-6 rounded-2xl border border-dashed border-border-strong bg-surface p-16 text-center"
+        >
+            <h3 class="text-lg font-semibold">Пока нет мониторов</h3>
+            <p class="mx-auto mt-2 max-w-sm text-sm text-fg-muted">
+                Добавьте первый монитор, чтобы Pulseboard начал следить за доступностью ваших
+                сервисов.
+            </p>
+            <div class="mt-5 flex flex-wrap justify-center gap-2.5">
+                <RouterLink
+                    :to="{ name: 'monitors.create' }"
+                    class="rounded-[10px] bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+                >
+                    Создать монитор
+                </RouterLink>
+                <RouterLink
+                    :to="{ name: 'heartbeats.create' }"
+                    class="rounded-[10px] border border-border-strong bg-surface-2 px-5 py-2.5 text-sm font-semibold text-fg"
+                >
+                    Создать heartbeat
+                </RouterLink>
+            </div>
+        </div>
+
+        <!-- Data -->
+        <template v-else>
+            <div class="mt-6 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+                <div
+                    v-for="card in summary"
+                    :key="card.label"
+                    class="rounded-2xl border border-border bg-surface p-4"
+                >
+                    <div class="flex items-center gap-2 text-[12.5px] font-semibold text-fg-subtle">
+                        <span class="h-2.5 w-2.5 rounded-full" :class="card.dot" />
+                        {{ card.label }}
+                    </div>
+                    <div class="mt-2.5 font-mono text-3xl font-bold tracking-tight">
+                        {{ card.value }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-[13.5px] text-fg-muted">
+                    {{ monitors.monitors.length }} под наблюдением
+                </div>
+                <div class="flex gap-1.5 rounded-[10px] border border-border bg-surface-2 p-1">
                     <button
                         type="button"
-                        class="rounded-md border border-slate-700 px-3 py-1.5 text-slate-300 hover:bg-slate-900"
-                        @click="logout"
+                        class="rounded-md px-3 py-1.5 text-[13px] font-semibold"
+                        :class="view === 'list' ? 'bg-surface text-fg' : 'text-fg-subtle'"
+                        @click="view = 'list'"
                     >
-                        Sign out
+                        Список
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-md px-3 py-1.5 text-[13px] font-semibold"
+                        :class="view === 'cards' ? 'bg-surface text-fg' : 'text-fg-subtle'"
+                        @click="view = 'cards'"
+                    >
+                        Карточки
                     </button>
                 </div>
             </div>
-        </header>
 
-        <section class="mx-auto max-w-5xl px-6 py-10">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-semibold">Monitors</h1>
-                    <p class="mt-1 text-sm text-slate-400">
-                        Live status — updates over WebSockets as checks run.
-                    </p>
-                </div>
-                <div class="flex gap-2">
-                    <RouterLink
-                        :to="{ name: 'heartbeats.create' }"
-                        class="rounded-md border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-900"
-                    >
-                        New heartbeat
-                    </RouterLink>
-                    <RouterLink
-                        :to="{ name: 'monitors.create' }"
-                        class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
-                    >
-                        New monitor
-                    </RouterLink>
-                </div>
-            </div>
-
-            <p v-if="monitors.loading" class="mt-8 text-slate-400">Loading…</p>
-
+            <!-- List view -->
             <div
-                v-else-if="monitors.monitors.length === 0"
-                class="mt-8 rounded-lg border border-dashed border-slate-800 p-10 text-center"
+                v-if="view === 'list'"
+                class="overflow-hidden rounded-2xl border border-border bg-surface"
             >
-                <p class="text-slate-300">No monitors yet.</p>
-                <p class="mt-1 text-sm text-slate-500">
-                    Create your first monitor to start tracking uptime.
-                </p>
+                <div
+                    v-for="monitor in monitors.monitors"
+                    :key="monitor.id"
+                    class="flex cursor-pointer items-center gap-4 border-b border-border px-5 py-3.5 last:border-b-0 hover:bg-surface-2"
+                    :class="{ 'pb-flash': flashId === monitor.id }"
+                    :style="{ borderLeft: `3px solid ${statusMeta(monitor).accent}` }"
+                    @click="open(monitor)"
+                >
+                    <span
+                        class="flex h-7 w-7 flex-none items-center justify-center rounded-lg text-xs font-bold"
+                        :class="statusMeta(monitor).pill"
+                        :title="statusMeta(monitor).label"
+                    >
+                        {{ statusMeta(monitor).glyph }}
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <div class="truncate text-sm font-semibold">{{ monitor.name }}</div>
+                        <div class="truncate font-mono text-[11.5px] text-fg-subtle">
+                            {{ monitor.target ?? 'heartbeat' }}
+                        </div>
+                    </div>
+                    <span
+                        class="hidden rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11.5px] font-semibold text-fg-muted sm:inline-block"
+                    >
+                        {{ typeLabel(monitor.type) }}
+                    </span>
+                    <span class="hidden w-20 font-mono text-[13px] text-fg-muted md:inline-block">
+                        {{ latency(monitor) }}
+                    </span>
+                    <span class="hidden w-32 text-[12.5px] text-fg-subtle lg:inline-block">
+                        {{ relativeTime(monitor.last_checked_at) }}
+                    </span>
+                    <div class="flex flex-none gap-1.5" @click.stop>
+                        <button
+                            type="button"
+                            :title="monitor.is_paused ? 'Снять с паузы' : 'Пауза'"
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface-2 text-fg-muted"
+                            @click="togglePause(monitor)"
+                        >
+                            {{ monitor.is_paused ? '▶' : '⏸' }}
+                        </button>
+                        <button
+                            type="button"
+                            title="Редактировать"
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface-2 text-fg-muted"
+                            @click="edit(monitor)"
+                        >
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            title="Удалить"
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface-2 text-down"
+                            @click="remove(monitor)"
+                        >
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <div v-else class="mt-8 overflow-hidden rounded-lg border border-slate-800">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-slate-900 text-slate-400">
-                        <tr>
-                            <th class="px-4 py-3 font-medium">Status</th>
-                            <th class="px-4 py-3 font-medium">Name</th>
-                            <th class="px-4 py-3 font-medium">Type</th>
-                            <th class="px-4 py-3 font-medium">Target</th>
-                            <th class="px-4 py-3 text-right font-medium">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800">
-                        <tr v-for="monitor in monitors.monitors" :key="monitor.id">
-                            <td class="px-4 py-3">
-                                <span
-                                    class="rounded-full px-2 py-0.5 text-xs font-medium"
-                                    :class="statusBadge(monitor).classes"
-                                >
-                                    {{ statusBadge(monitor).text }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 font-medium">
-                                <RouterLink
-                                    :to="{ name: 'monitors.show', params: { id: monitor.id } }"
-                                    class="text-slate-100 hover:text-emerald-400"
-                                >
-                                    {{ monitor.name }}
-                                </RouterLink>
-                            </td>
-                            <td class="px-4 py-3 text-slate-400 uppercase">{{ monitor.type }}</td>
-                            <td class="max-w-xs truncate px-4 py-3 text-slate-400">
-                                {{ monitor.target
-                                }}<template v-if="monitor.port">:{{ monitor.port }}</template>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="flex justify-end gap-3 text-xs">
-                                    <RouterLink
-                                        :to="{ name: 'monitors.edit', params: { id: monitor.id } }"
-                                        class="text-slate-300 hover:text-emerald-400"
-                                    >
-                                        Edit
-                                    </RouterLink>
-                                    <button
-                                        type="button"
-                                        class="text-slate-300 hover:text-amber-400"
-                                        @click="togglePause(monitor)"
-                                    >
-                                        {{ monitor.is_paused ? 'Resume' : 'Pause' }}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="text-slate-300 hover:text-red-400"
-                                        @click="remove(monitor)"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- Card view -->
+            <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div
+                    v-for="monitor in monitors.monitors"
+                    :key="monitor.id"
+                    class="cursor-pointer rounded-2xl border border-border bg-surface p-5 hover:border-border-strong"
+                    :class="{ 'pb-flash': flashId === monitor.id }"
+                    :style="{ borderTop: `3px solid ${statusMeta(monitor).accent}` }"
+                    @click="open(monitor)"
+                >
+                    <div class="mb-3.5 flex items-center justify-between">
+                        <StatusBadge :meta="statusMeta(monitor)" with-glyph />
+                        <span class="text-[11.5px] font-semibold text-fg-subtle">
+                            {{ typeLabel(monitor.type) }}
+                        </span>
+                    </div>
+                    <div class="text-[15px] font-semibold">{{ monitor.name }}</div>
+                    <div class="mt-0.5 truncate font-mono text-[11.5px] text-fg-subtle">
+                        {{ monitor.target ?? 'heartbeat' }}
+                    </div>
+                    <div class="mt-3.5 flex justify-between text-[12.5px] text-fg-subtle">
+                        <span
+                            >Задержка
+                            <b class="font-mono text-fg-muted">{{ latency(monitor) }}</b></span
+                        >
+                        <span>{{ relativeTime(monitor.last_checked_at) }}</span>
+                    </div>
+                </div>
             </div>
-        </section>
-    </main>
+        </template>
+    </AppShell>
 </template>

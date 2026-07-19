@@ -2,11 +2,14 @@
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import AppShell from '@/components/AppShell.vue';
 import { validationErrors } from '@/lib/http';
 import { useMonitorsStore } from '@/stores/monitors';
+import { useUiStore } from '@/stores/ui';
 import type { HeartbeatInput } from '@/types/monitor';
 
 const monitors = useMonitorsStore();
+const ui = useUiStore();
 const router = useRouter();
 
 const form = reactive<HeartbeatInput>({
@@ -24,7 +27,7 @@ async function submit(): Promise<void> {
 
     try {
         const monitor = await monitors.createHeartbeat({ ...form });
-        // The detail page shows the generated ping URL.
+        ui.notify('Heartbeat создан — скопируйте URL для пинга', 'up');
         await router.push({ name: 'monitors.show', params: { id: monitor.id } });
     } catch (error) {
         errors.value = validationErrors(error);
@@ -35,78 +38,114 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-    <main class="min-h-screen bg-slate-950 px-6 py-10 text-slate-100">
-        <div class="mx-auto max-w-lg">
+    <AppShell>
+        <div class="max-w-2xl">
             <RouterLink
                 :to="{ name: 'dashboard' }"
-                class="text-sm text-slate-400 hover:text-emerald-400"
+                class="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-fg-muted hover:text-accent"
             >
-                ← Back to monitors
+                ← Отмена
             </RouterLink>
-            <h1 class="mt-3 text-2xl font-semibold">New heartbeat monitor</h1>
-            <p class="mt-1 text-sm text-slate-400">
-                Pulseboard waits for a periodic ping from your cron. If it does not arrive within
-                the grace period, an incident is opened.
-            </p>
+            <h1 class="text-[26px] font-semibold tracking-tight">Новый heartbeat-монитор</h1>
 
-            <form class="mt-6 space-y-4" @submit.prevent="submit">
-                <p v-if="errors.form" class="rounded-md bg-red-950 p-3 text-sm text-red-300">
+            <div class="mt-4 mb-6 flex gap-3.5 rounded-2xl border border-accent bg-accent-soft p-4">
+                <div class="flex-none text-xl leading-none">◔</div>
+                <p class="text-[13.5px] text-fg text-pretty">
+                    В отличие от обычных проверок, здесь
+                    <b>ваш сервис сам пингует Pulseboard</b> по расписанию (например, из cron). Если
+                    пинг не приходит вовремя — мы открываем инцидент. Тишина = проблема.
+                </p>
+            </div>
+
+            <form class="space-y-5" @submit.prevent="submit">
+                <p
+                    v-if="errors.form"
+                    class="rounded-[10px] border border-down bg-down-soft px-3.5 py-3 text-sm font-medium text-down"
+                >
                     {{ errors.form[0] }}
                 </p>
 
                 <div>
-                    <label for="name" class="block text-sm text-slate-400">Name</label>
+                    <label
+                        for="name"
+                        class="mb-1.5 block text-[12.5px] font-semibold text-fg-muted"
+                    >
+                        Название
+                    </label>
                     <input
                         id="name"
                         v-model="form.name"
                         type="text"
                         required
-                        class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 focus:border-emerald-500 focus:outline-none"
+                        placeholder="Напр., Ночной бэкап БД"
+                        class="w-full rounded-[10px] border border-border-strong bg-bg-2 px-3.5 py-2.5 text-sm focus:border-accent focus:outline-none"
                     />
-                    <p v-if="errors.name" class="mt-1 text-sm text-red-400">{{ errors.name[0] }}</p>
+                    <p v-if="errors.name" class="mt-1.5 text-[12.5px] text-down">
+                        {{ errors.name[0] }}
+                    </p>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label for="interval_sec" class="block text-sm text-slate-400">
-                            Expected interval (s)
+                        <label
+                            for="interval_sec"
+                            class="mb-1.5 block text-[12.5px] font-semibold text-fg-muted"
+                        >
+                            Ожидаемый интервал, сек
                         </label>
                         <input
                             id="interval_sec"
                             v-model.number="form.interval_sec"
                             type="number"
                             min="60"
-                            class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 focus:border-emerald-500 focus:outline-none"
+                            class="w-full rounded-[10px] border border-border-strong bg-bg-2 px-3.5 py-2.5 font-mono text-[13px] focus:border-accent focus:outline-none"
                         />
-                        <p v-if="errors.interval_sec" class="mt-1 text-sm text-red-400">
+                        <p class="mt-1.5 text-[12px] text-fg-subtle">Как часто ждём пинг.</p>
+                        <p v-if="errors.interval_sec" class="mt-1 text-[12.5px] text-down">
                             {{ errors.interval_sec[0] }}
                         </p>
                     </div>
                     <div>
-                        <label for="grace_sec" class="block text-sm text-slate-400">
-                            Grace period (s)
+                        <label
+                            for="grace_sec"
+                            class="mb-1.5 block text-[12.5px] font-semibold text-fg-muted"
+                        >
+                            Льготный период, сек
                         </label>
                         <input
                             id="grace_sec"
                             v-model.number="form.grace_sec"
                             type="number"
                             min="30"
-                            class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 focus:border-emerald-500 focus:outline-none"
+                            class="w-full rounded-[10px] border border-border-strong bg-bg-2 px-3.5 py-2.5 font-mono text-[13px] focus:border-accent focus:outline-none"
                         />
-                        <p v-if="errors.grace_sec" class="mt-1 text-sm text-red-400">
+                        <p class="mt-1.5 text-[12px] text-fg-subtle">Запас перед инцидентом.</p>
+                        <p v-if="errors.grace_sec" class="mt-1 text-[12.5px] text-down">
                             {{ errors.grace_sec[0] }}
                         </p>
                     </div>
                 </div>
 
-                <button
-                    type="submit"
-                    :disabled="processing"
-                    class="w-full rounded-md bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-                >
-                    {{ processing ? 'Creating…' : 'Create heartbeat' }}
-                </button>
+                <div class="flex gap-2.5 pt-2">
+                    <button
+                        type="submit"
+                        :disabled="processing"
+                        class="flex items-center gap-2 rounded-[11px] bg-accent px-6 py-3 text-[15px] font-semibold text-white disabled:opacity-75"
+                    >
+                        <span
+                            v-if="processing"
+                            class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                        />
+                        Создать и получить URL
+                    </button>
+                    <RouterLink
+                        :to="{ name: 'dashboard' }"
+                        class="rounded-[11px] border border-border bg-surface-2 px-6 py-3 text-[15px] font-semibold text-fg"
+                    >
+                        Отмена
+                    </RouterLink>
+                </div>
             </form>
         </div>
-    </main>
+    </AppShell>
 </template>

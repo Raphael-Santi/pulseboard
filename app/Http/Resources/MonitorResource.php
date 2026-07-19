@@ -34,6 +34,7 @@ class MonitorResource extends JsonResource
             'grace_sec' => $this->grace_sec,
             'last_ping_at' => $this->last_ping_at,
             'latest_status' => $this->latestCheck?->status->value,
+            'latest_latency_ms' => $this->latestCheck?->latency_ms,
             'last_checked_at' => $this->latestCheck?->checked_at,
             'has_open_incident' => $this->openIncidents->isNotEmpty(),
             'created_at' => $this->created_at,

@@ -23,10 +23,10 @@ const chartData = computed(() => ({
     ),
     datasets: [
         {
-            label: 'Latency (ms)',
+            label: 'Задержка (мс)',
             data: props.points.map((point) => point.avg_ms),
-            borderColor: '#34d399',
-            backgroundColor: 'rgba(52, 211, 153, 0.12)',
+            borderColor: '#8b80f2',
+            backgroundColor: 'rgba(139, 128, 242, 0.14)',
             fill: true,
             tension: 0.3,
             pointRadius: 0,
@@ -38,8 +38,12 @@ const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
-        x: { grid: { display: false }, ticks: { color: '#64748b', maxTicksLimit: 8 } },
-        y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b' }, beginAtZero: true },
+        x: { grid: { display: false }, ticks: { color: '#8a8a9a', maxTicksLimit: 8 } },
+        y: {
+            grid: { color: 'rgba(128,128,150,0.14)' },
+            ticks: { color: '#8a8a9a' },
+            beginAtZero: true,
+        },
     },
     plugins: { legend: { display: false } },
 } as const;
@@ -48,8 +52,8 @@ const chartOptions = {
 <template>
     <div class="h-64">
         <Line v-if="points.length > 0" :data="chartData" :options="chartOptions" />
-        <p v-else class="flex h-full items-center justify-center text-sm text-slate-500">
-            No latency data yet.
+        <p v-else class="flex h-full items-center justify-center text-sm text-fg-subtle">
+            Пока нет данных о задержке.
         </p>
     </div>
 </template>

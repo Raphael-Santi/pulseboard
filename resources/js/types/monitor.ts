@@ -24,6 +24,7 @@ export interface Monitor {
     grace_sec: number | null;
     last_ping_at: string | null;
     latest_status: CheckStatus | null;
+    latest_latency_ms: number | null;
     last_checked_at: string | null;
     has_open_incident: boolean;
     created_at: string;

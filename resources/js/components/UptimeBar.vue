@@ -5,29 +5,29 @@ defineProps<{ days: UptimeDay[] }>();
 
 function barClass(day: UptimeDay): string {
     if (day.uptime === null) {
-        return 'bg-slate-800';
+        return 'bg-border';
     }
     if (day.uptime >= 99) {
-        return 'bg-emerald-500';
+        return 'bg-up';
     }
     if (day.uptime >= 90) {
-        return 'bg-amber-500';
+        return 'bg-warn';
     }
-    return 'bg-red-500';
+    return 'bg-down';
 }
 
 function title(day: UptimeDay): string {
-    const value = day.uptime === null ? 'no data' : `${day.uptime}%`;
+    const value = day.uptime === null ? 'нет данных' : `${day.uptime}%`;
     return `${day.date}: ${value}`;
 }
 </script>
 
 <template>
-    <div class="flex items-end gap-[2px]">
+    <div class="flex h-8 items-stretch gap-[2px]">
         <span
             v-for="day in days"
             :key="day.date"
-            class="h-8 w-[3px] rounded-sm"
+            class="min-w-[2px] flex-1 rounded-[2px] transition hover:brightness-125"
             :class="barClass(day)"
             :title="title(day)"
         />

@@ -30,6 +30,7 @@ function monitor(overrides: Partial<Monitor> = {}): Monitor {
         grace_sec: null,
         last_ping_at: null,
         latest_status: null,
+        latest_latency_ms: null,
         last_checked_at: null,
         has_open_incident: false,
         created_at: '',

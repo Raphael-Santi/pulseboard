@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import BrandMark from '@/components/BrandMark.vue';
 import { validationErrors } from '@/lib/http';
 import { useAuthStore } from '@/stores/auth';
 
@@ -32,63 +33,87 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-    <main class="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100">
-        <div class="w-full max-w-sm">
-            <RouterLink to="/" class="text-sm font-medium tracking-widest text-emerald-400">
-                PULSEBOARD
+    <main class="grid min-h-screen place-items-center bg-bg px-6 text-fg">
+        <div class="pb-fade w-full max-w-[420px]">
+            <RouterLink to="/" class="mb-7 inline-flex items-center gap-2.5">
+                <BrandMark :size="18" />
+                <span class="text-[17px] font-bold">Pulseboard</span>
             </RouterLink>
-            <h1 class="mt-4 text-2xl font-semibold">Sign in</h1>
 
-            <form class="mt-6 space-y-4" @submit.prevent="submit">
-                <p v-if="errors.form" class="rounded-md bg-red-950 p-3 text-sm text-red-300">
+            <div class="rounded-[18px] border border-border bg-surface p-8 shadow-xl">
+                <h1 class="text-2xl font-semibold">С возвращением</h1>
+                <p class="mt-1.5 text-sm text-fg-muted">Войдите, чтобы открыть свой дашборд.</p>
+
+                <p
+                    v-if="errors.form"
+                    class="mt-5 rounded-[10px] border border-down bg-down-soft px-3.5 py-3 text-sm font-medium text-down"
+                >
                     {{ errors.form[0] }}
                 </p>
 
-                <div>
-                    <label for="email" class="block text-sm text-slate-400">Email</label>
-                    <input
-                        id="email"
-                        v-model="email"
-                        type="email"
-                        required
-                        autocomplete="email"
-                        class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
-                    />
-                    <p v-if="errors.email" class="mt-1 text-sm text-red-400">
-                        {{ errors.email[0] }}
-                    </p>
-                </div>
+                <form class="mt-5 space-y-4" @submit.prevent="submit">
+                    <div>
+                        <label
+                            for="email"
+                            class="mb-1.5 block text-[12.5px] font-semibold text-fg-muted"
+                        >
+                            Email
+                        </label>
+                        <input
+                            id="email"
+                            v-model="email"
+                            type="email"
+                            required
+                            autocomplete="email"
+                            placeholder="you@company.com"
+                            class="w-full rounded-[10px] border border-border-strong bg-bg-2 px-3.5 py-2.5 text-sm text-fg focus:border-accent focus:outline-none"
+                        />
+                        <p v-if="errors.email" class="mt-1.5 text-[12.5px] text-down">
+                            {{ errors.email[0] }}
+                        </p>
+                    </div>
 
-                <div>
-                    <label for="password" class="block text-sm text-slate-400">Password</label>
-                    <input
-                        id="password"
-                        v-model="password"
-                        type="password"
-                        required
-                        autocomplete="current-password"
-                        class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
-                    />
-                    <p v-if="errors.password" class="mt-1 text-sm text-red-400">
-                        {{ errors.password[0] }}
-                    </p>
-                </div>
+                    <div>
+                        <label
+                            for="password"
+                            class="mb-1.5 block text-[12.5px] font-semibold text-fg-muted"
+                        >
+                            Пароль
+                        </label>
+                        <input
+                            id="password"
+                            v-model="password"
+                            type="password"
+                            required
+                            autocomplete="current-password"
+                            placeholder="••••••••"
+                            class="w-full rounded-[10px] border border-border-strong bg-bg-2 px-3.5 py-2.5 text-sm text-fg focus:border-accent focus:outline-none"
+                        />
+                        <p v-if="errors.password" class="mt-1.5 text-[12.5px] text-down">
+                            {{ errors.password[0] }}
+                        </p>
+                    </div>
 
-                <button
-                    type="submit"
-                    :disabled="processing"
-                    class="w-full rounded-md bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-                >
-                    {{ processing ? 'Signing in…' : 'Sign in' }}
-                </button>
-            </form>
+                    <button
+                        type="submit"
+                        :disabled="processing"
+                        class="flex w-full items-center justify-center gap-2 rounded-[11px] bg-accent px-4 py-3 text-[15px] font-semibold text-white disabled:opacity-75"
+                    >
+                        <span
+                            v-if="processing"
+                            class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                        />
+                        {{ processing ? 'Подождите…' : 'Войти' }}
+                    </button>
+                </form>
 
-            <p class="mt-6 text-sm text-slate-400">
-                No account?
-                <RouterLink to="/register" class="text-emerald-400 hover:underline">
-                    Create one
-                </RouterLink>
-            </p>
+                <p class="mt-5 text-center text-sm text-fg-muted">
+                    Нет аккаунта?
+                    <RouterLink to="/register" class="font-semibold text-accent">
+                        Зарегистрироваться
+                    </RouterLink>
+                </p>
+            </div>
         </div>
     </main>
 </template>

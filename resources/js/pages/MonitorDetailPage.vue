@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
+import AppShell from '@/components/AppShell.vue';
 import LatencyChart from '@/components/LatencyChart.vue';
+import StatusBadge from '@/components/StatusBadge.vue';
+import { monitorStatusMeta, typeLabel } from '@/lib/status';
+import { formatDateTime, relativeTime } from '@/lib/time';
 import { useMonitorsStore } from '@/stores/monitors';
+import { useUiStore } from '@/stores/ui';
 import type { Incident, MetricsWindow, MonitorMetrics } from '@/types/metrics';
 import type { Monitor } from '@/types/monitor';
 
 const route = useRoute();
+const router = useRouter();
 const store = useMonitorsStore();
+const ui = useUiStore();
 
 const monitorId = computed(() => Number(route.params.id));
 
@@ -22,6 +29,28 @@ const pingUrl = computed(() =>
     monitor.value?.token ? `${globalThis.location.origin}/api/hb/${monitor.value.token}` : null,
 );
 
+const uptimeCards = computed(() => [
+    { range: '24 часа', value: metrics.value?.uptime['24h'] ?? null },
+    { range: '7 дней', value: metrics.value?.uptime['7d'] ?? null },
+    { range: '30 дней', value: metrics.value?.uptime['30d'] ?? null },
+]);
+
+const latencyStats = computed(() => {
+    const points = metrics.value?.latency.points ?? [];
+    if (points.length === 0) {
+        return { avg: '—', max: '—' };
+    }
+    const values = points.map((point) => point.avg_ms);
+    const avg = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+    return { avg: `${avg} мс`, max: `${Math.max(...values)} мс` };
+});
+
+const incidentMeta: Record<string, { label: string; pill: string }> = {
+    open: { label: 'Открыт', pill: 'bg-down-soft text-down' },
+    acknowledged: { label: 'Принят в работу', pill: 'bg-warn-soft text-warn' },
+    closed: { label: 'Решён', pill: 'bg-unknown-soft text-fg-muted' },
+};
+
 async function loadMetrics(): Promise<void> {
     metrics.value = await store.fetchMetrics(monitorId.value, activeWindow.value);
 }
@@ -31,9 +60,42 @@ async function setWindow(next: MetricsWindow): Promise<void> {
     await loadMetrics();
 }
 
+async function togglePause(): Promise<void> {
+    if (!monitor.value) {
+        return;
+    }
+    const wasPaused = monitor.value.is_paused;
+    await store.togglePause(monitor.value.id);
+    monitor.value = store.find(monitorId.value) ?? monitor.value;
+    ui.notify(wasPaused ? 'Монитор снят с паузы' : 'Монитор поставлен на паузу');
+}
+
+async function remove(): Promise<void> {
+    if (!monitor.value) {
+        return;
+    }
+    const confirmed = await ui.confirm({
+        title: 'Удалить монитор?',
+        body: `«${monitor.value.name}» и вся его история будут удалены безвозвратно.`,
+    });
+    if (confirmed) {
+        await store.remove(monitor.value.id);
+        ui.notify('Монитор удалён', 'down');
+        await router.push({ name: 'dashboard' });
+    }
+}
+
 async function acknowledge(incident: Incident): Promise<void> {
     const updated = await store.acknowledgeIncident(incident.id);
     incidents.value = incidents.value.map((item) => (item.id === updated.id ? updated : item));
+    ui.notify('Инцидент принят в работу');
+}
+
+function copyPing(): void {
+    if (pingUrl.value) {
+        void navigator.clipboard?.writeText(pingUrl.value);
+        ui.notify('URL скопирован');
+    }
 }
 
 onMounted(async () => {
@@ -47,126 +109,197 @@ onMounted(async () => {
         loading.value = false;
     }
 });
-
-function formatUptime(value: number | null): string {
-    return value === null ? '—' : `${value}%`;
-}
 </script>
 
 <template>
-    <main class="min-h-screen bg-slate-950 text-slate-100">
-        <header class="border-b border-slate-800">
-            <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-                <RouterLink
-                    :to="{ name: 'dashboard' }"
-                    class="text-sm text-slate-400 hover:text-emerald-400"
-                >
-                    ← Monitors
-                </RouterLink>
+    <AppShell>
+        <RouterLink
+            :to="{ name: 'dashboard' }"
+            class="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-fg-muted hover:text-accent"
+        >
+            ← Назад к дашборду
+        </RouterLink>
+
+        <!-- Loading -->
+        <div v-if="loading" class="flex flex-col gap-4">
+            <div class="pb-skeleton h-20 rounded-2xl bg-surface" />
+            <div class="grid gap-4 sm:grid-cols-3">
+                <div class="pb-skeleton h-24 rounded-2xl bg-surface" />
+                <div class="pb-skeleton h-24 rounded-2xl bg-surface" />
+                <div class="pb-skeleton h-24 rounded-2xl bg-surface" />
             </div>
-        </header>
+            <div class="pb-skeleton h-56 rounded-2xl bg-surface" />
+        </div>
 
-        <section v-if="loading" class="mx-auto max-w-4xl px-6 py-10 text-slate-400">
-            Loading…
-        </section>
-
-        <section v-else-if="monitor" class="mx-auto max-w-4xl px-6 py-10">
-            <h1 class="text-2xl font-semibold">{{ monitor.name }}</h1>
-            <p class="mt-1 text-sm text-slate-400">
-                {{ monitor.type.toUpperCase() }}
-                <template v-if="monitor.target">
-                    · {{ monitor.target
-                    }}<template v-if="monitor.port">:{{ monitor.port }}</template>
-                </template>
-            </p>
-
+        <template v-else-if="monitor">
+            <!-- Header -->
             <div
-                v-if="monitor.type === 'heartbeat' && pingUrl"
-                class="mt-6 rounded-lg border border-slate-800 bg-slate-900/40 p-4"
+                class="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-border bg-surface p-6"
+                :style="{ borderLeft: `4px solid ${monitorStatusMeta(monitor).accent}` }"
             >
-                <p class="text-xs tracking-wide text-slate-500 uppercase">Ping URL</p>
-                <code class="mt-1 block text-sm break-all text-emerald-300"
-                    >POST {{ pingUrl }}</code
-                >
-                <p class="mt-2 text-xs text-slate-500">
-                    Call this from your cron on schedule. A missed ping opens an incident after the
-                    grace period.
-                </p>
-            </div>
-
-            <div class="mt-8 grid grid-cols-3 gap-4">
-                <div
-                    v-for="key in ['24h', '7d', '30d'] as const"
-                    :key="key"
-                    class="rounded-lg border border-slate-800 bg-slate-900/40 p-4"
-                >
-                    <p class="text-xs tracking-wide text-slate-500 uppercase">Uptime {{ key }}</p>
-                    <p class="mt-1 text-2xl font-semibold text-emerald-400">
-                        {{ formatUptime(metrics?.uptime[key] ?? null) }}
-                    </p>
+                <div class="min-w-0">
+                    <div class="mb-2 flex flex-wrap items-center gap-3">
+                        <StatusBadge :meta="monitorStatusMeta(monitor)" with-glyph />
+                        <span
+                            class="rounded-md border border-border bg-surface-2 px-2.5 py-1 text-xs font-semibold text-fg-muted"
+                        >
+                            {{ typeLabel(monitor.type) }}
+                        </span>
+                    </div>
+                    <h1 class="text-2xl font-semibold tracking-tight">{{ monitor.name }}</h1>
+                    <div class="mt-1 font-mono text-[13px] text-fg-subtle">
+                        {{ monitor.target ?? 'heartbeat' }}
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        class="rounded-[9px] border border-border-strong bg-surface-2 px-3.5 py-2 text-[13.5px] font-semibold text-fg"
+                        @click="togglePause"
+                    >
+                        {{ monitor.is_paused ? 'Снять с паузы' : 'Пауза' }}
+                    </button>
+                    <RouterLink
+                        :to="{ name: 'monitors.edit', params: { id: monitor.id } }"
+                        class="rounded-[9px] border border-border-strong bg-surface-2 px-3.5 py-2 text-[13.5px] font-semibold text-fg"
+                    >
+                        Редактировать
+                    </RouterLink>
+                    <button
+                        type="button"
+                        class="rounded-[9px] border border-border bg-surface-2 px-3.5 py-2 text-[13.5px] font-semibold text-down"
+                        @click="remove"
+                    >
+                        Удалить
+                    </button>
                 </div>
             </div>
 
-            <div class="mt-8 rounded-lg border border-slate-800 p-4">
-                <div class="mb-4 flex items-center justify-between">
-                    <h2 class="text-sm font-medium text-slate-300">Latency</h2>
-                    <div class="flex gap-1 text-xs">
+            <!-- Heartbeat ping box -->
+            <div
+                v-if="monitor.type === 'heartbeat' && pingUrl"
+                class="mt-4 rounded-2xl border border-accent bg-accent-soft p-6"
+            >
+                <div class="text-sm font-semibold text-fg">Секретный URL для пинга</div>
+                <p class="mt-1 mb-3.5 text-[13px] text-fg-muted">
+                    Вставьте этот адрес в свой cron. Если Pulseboard не получит запрос вовремя —
+                    откроется инцидент.
+                </p>
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <code
+                        class="flex-1 overflow-x-auto rounded-[10px] border border-border-strong bg-bg-2 px-3.5 py-2.5 font-mono text-[12.5px] whitespace-nowrap"
+                    >
+                        POST {{ pingUrl }}
+                    </code>
+                    <button
+                        type="button"
+                        class="rounded-[10px] bg-accent px-4 py-2.5 text-[13.5px] font-semibold whitespace-nowrap text-white"
+                        @click="copyPing"
+                    >
+                        Копировать
+                    </button>
+                </div>
+                <div class="mt-3 text-[12.5px] text-fg-muted">
+                    Последний пинг:
+                    <b class="font-mono">{{ relativeTime(monitor.last_ping_at) }}</b>
+                </div>
+            </div>
+
+            <!-- Uptime cards -->
+            <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                <div
+                    v-for="card in uptimeCards"
+                    :key="card.range"
+                    class="rounded-2xl border border-border bg-surface p-5"
+                >
+                    <div class="text-[12.5px] font-semibold text-fg-subtle">
+                        Аптайм · {{ card.range }}
+                    </div>
+                    <div class="mt-2 font-mono text-3xl font-bold tracking-tight text-up">
+                        {{ card.value === null ? '—' : `${card.value}%` }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Latency chart -->
+            <div class="mt-4 rounded-2xl border border-border bg-surface p-6">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-semibold">Задержка ответа</h2>
+                        <div class="text-[12.5px] text-fg-subtle">
+                            среднее <b class="font-mono text-fg-muted">{{ latencyStats.avg }}</b> ·
+                            пик <b class="font-mono text-fg-muted">{{ latencyStats.max }}</b>
+                        </div>
+                    </div>
+                    <div class="flex gap-1.5 rounded-[10px] border border-border bg-surface-2 p-1">
                         <button
-                            v-for="option in ['24h', '7d'] as const"
-                            :key="option"
                             type="button"
-                            class="rounded-md px-2 py-1"
+                            class="rounded-md px-3.5 py-1.5 text-[13px] font-semibold"
                             :class="
-                                activeWindow === option
-                                    ? 'bg-slate-800 text-emerald-400'
-                                    : 'text-slate-400 hover:text-slate-200'
+                                activeWindow === '24h' ? 'bg-surface text-fg' : 'text-fg-subtle'
                             "
-                            @click="setWindow(option)"
+                            @click="setWindow('24h')"
                         >
-                            {{ option }}
+                            24ч
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-md px-3.5 py-1.5 text-[13px] font-semibold"
+                            :class="activeWindow === '7d' ? 'bg-surface text-fg' : 'text-fg-subtle'"
+                            @click="setWindow('7d')"
+                        >
+                            7д
                         </button>
                     </div>
                 </div>
                 <LatencyChart :points="metrics?.latency.points ?? []" />
             </div>
 
-            <div class="mt-8">
-                <h2 class="text-sm font-medium text-slate-300">Incidents</h2>
-                <p v-if="incidents.length === 0" class="mt-3 text-sm text-slate-500">
-                    No incidents recorded.
-                </p>
-                <ul v-else class="mt-3 space-y-3">
-                    <li
+            <!-- Incidents -->
+            <div class="mt-4 rounded-2xl border border-border bg-surface p-6">
+                <h2 class="mb-4 text-base font-semibold">История инцидентов</h2>
+                <div v-if="incidents.length === 0" class="py-8 text-center text-sm text-fg-subtle">
+                    <div class="mb-2 text-xl text-up">✓</div>
+                    Инцидентов не было. Монитор работает стабильно.
+                </div>
+                <div v-else class="flex flex-col gap-3">
+                    <div
                         v-for="incident in incidents"
                         :key="incident.id"
-                        class="rounded-lg border border-slate-800 p-4"
+                        class="flex gap-4 rounded-xl border border-border bg-bg-2 p-4"
+                        :style="{
+                            borderLeft: `3px solid ${incident.status === 'closed' ? 'var(--color-unknown)' : incident.status === 'acknowledged' ? 'var(--color-warn)' : 'var(--color-down)'}`,
+                        }"
                     >
-                        <div class="flex items-center justify-between">
-                            <span
-                                class="rounded-full px-2 py-0.5 text-xs font-medium"
-                                :class="{
-                                    'bg-red-950 text-red-400': incident.status === 'open',
-                                    'bg-amber-950 text-amber-400':
-                                        incident.status === 'acknowledged',
-                                    'bg-slate-800 text-slate-400': incident.status === 'closed',
-                                }"
-                            >
-                                {{ incident.status }}
-                            </span>
-                            <button
-                                v-if="incident.status === 'open'"
-                                type="button"
-                                class="text-xs text-slate-400 hover:text-amber-400"
-                                @click="acknowledge(incident)"
-                            >
-                                Acknowledge
-                            </button>
+                        <div class="min-w-0 flex-1">
+                            <div class="mb-1.5 flex flex-wrap items-center gap-2.5">
+                                <span
+                                    class="rounded-md px-2 py-0.5 text-[11.5px] font-bold"
+                                    :class="incidentMeta[incident.status]?.pill"
+                                >
+                                    {{ incidentMeta[incident.status]?.label }}
+                                </span>
+                                <span class="text-sm font-semibold">{{ incident.cause }}</span>
+                            </div>
+                            <div class="text-[12.5px] text-fg-subtle">
+                                Начало {{ formatDateTime(incident.opened_at) }}
+                                <template v-if="incident.closed_at">
+                                    · решён {{ formatDateTime(incident.closed_at) }}
+                                </template>
+                                <template v-else>· длится сейчас</template>
+                            </div>
                         </div>
-                        <p class="mt-2 text-sm text-slate-300">{{ incident.cause }}</p>
-                        <p class="mt-1 text-xs text-slate-500">Opened {{ incident.opened_at }}</p>
-                    </li>
-                </ul>
+                        <button
+                            v-if="incident.status === 'open'"
+                            type="button"
+                            class="self-center rounded-[9px] border border-border-strong bg-surface px-3 py-2 text-[13px] font-semibold whitespace-nowrap text-fg"
+                            @click="acknowledge(incident)"
+                        >
+                            Принять в работу
+                        </button>
+                    </div>
+                </div>
             </div>
-        </section>
-    </main>
+        </template>
+    </AppShell>
 </template>

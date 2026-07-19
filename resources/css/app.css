@@ -1,3 +1,131 @@
 @import 'tailwindcss';
 
 @source '../../storage/framework/views/*.php';
+
+/*
+| Design tokens. Dark is the default; light overrides the same custom
+| properties under [data-theme="light"], so every Tailwind color utility
+| (bg-surface, text-fg, border-border, …) switches theme automatically.
+*/
+@theme {
+    --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+    --color-bg: oklch(0.165 0.006 264);
+    --color-bg-2: oklch(0.135 0.006 264);
+    --color-surface: oklch(0.205 0.007 264);
+    --color-surface-2: oklch(0.245 0.008 264);
+    --color-elev: oklch(0.275 0.009 264);
+    --color-border: oklch(0.315 0.008 264);
+    --color-border-strong: oklch(0.4 0.01 264);
+    --color-fg: oklch(0.97 0.003 264);
+    --color-fg-muted: oklch(0.78 0.006 264);
+    --color-fg-subtle: oklch(0.6 0.008 264);
+    --color-accent: oklch(0.68 0.16 276);
+    --color-accent-2: oklch(0.76 0.14 276);
+    --color-accent-soft: oklch(0.33 0.07 276);
+    --color-up: oklch(0.76 0.15 152);
+    --color-up-soft: oklch(0.31 0.07 152);
+    --color-down: oklch(0.66 0.2 25);
+    --color-down-soft: oklch(0.34 0.1 25);
+    --color-warn: oklch(0.82 0.13 82);
+    --color-warn-soft: oklch(0.34 0.07 82);
+    --color-unknown: oklch(0.64 0.015 264);
+    --color-unknown-soft: oklch(0.3 0.008 264);
+}
+
+:root[data-theme='light'] {
+    --color-bg: oklch(0.975 0.003 264);
+    --color-bg-2: oklch(0.945 0.004 264);
+    --color-surface: oklch(1 0 0);
+    --color-surface-2: oklch(0.975 0.003 264);
+    --color-elev: oklch(1 0 0);
+    --color-border: oklch(0.905 0.005 264);
+    --color-border-strong: oklch(0.83 0.007 264);
+    --color-fg: oklch(0.24 0.008 264);
+    --color-fg-muted: oklch(0.44 0.01 264);
+    --color-fg-subtle: oklch(0.56 0.01 264);
+    --color-accent: oklch(0.55 0.19 276);
+    --color-accent-2: oklch(0.48 0.2 276);
+    --color-accent-soft: oklch(0.93 0.04 276);
+    --color-up: oklch(0.6 0.15 152);
+    --color-up-soft: oklch(0.93 0.06 152);
+    --color-down: oklch(0.57 0.21 25);
+    --color-down-soft: oklch(0.94 0.07 25);
+    --color-warn: oklch(0.72 0.14 78);
+    --color-warn-soft: oklch(0.95 0.08 82);
+    --color-unknown: oklch(0.6 0.02 264);
+    --color-unknown-soft: oklch(0.93 0.005 264);
+}
+
+@layer base {
+    html {
+        background: var(--color-bg);
+        color-scheme: dark light;
+    }
+
+    body {
+        color: var(--color-fg);
+        font-family: var(--font-sans);
+    }
+}
+
+@keyframes pb-blink {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+}
+
+@keyframes pb-skeleton {
+    0% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 0.75;
+    }
+    100% {
+        opacity: 0.4;
+    }
+}
+
+@keyframes pb-fade {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes pb-toast {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@utility pb-blink {
+    animation: pb-blink 2s infinite;
+}
+
+@utility pb-skeleton {
+    animation: pb-skeleton 1.4s ease-in-out infinite;
+}
+
+@utility pb-fade {
+    animation: pb-fade 0.3s ease;
+}
+
+@utility pb-toast {
+    animation: pb-toast 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
